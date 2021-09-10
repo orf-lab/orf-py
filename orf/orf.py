@@ -11,6 +11,8 @@ Definitions of class and functions.
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from econml.grf import RegressionForest
 
 
 # define OrderedForest class
@@ -28,6 +30,19 @@ class OrderedForest:
         DESCRIPTION: Minimum leaf size in the forest. The default is 5.
     max_features : TYPE: float
         DESCRIPTION: Share of random covariates (0,1). The default is 0.3.
+    replace : TYPE: bool
+        DESCRIPTION: If True sampling with replacement, i.e. bootstrap is used 
+        to grow the trees, otherwise subsampling without replacement is used.
+        The default is False.
+    sample_fraction : TYPE: float
+        DESCRIPTION: Subsampling rate, i.e. the share of samples to draw from 
+        X to train each tree. The default is 0.5.
+    honesty : TYPE: bool
+        DESCRIPTION: If True honest forest is built using sample splitting.
+        The default is False.
+    honesty_fraction : TYPE: float
+        DESCRIPTION: Share of observations belonging to honest sample not used 
+        for growing the forest. The default is 0.5.
 
     Returns
     -------
@@ -37,7 +52,11 @@ class OrderedForest:
     # define init function
     def __init__(self, n_estimators=1000,
                  min_samples_leaf=5,
-                 max_features=0.3):
+                 max_features=0.3,
+                 replace=True,
+                 sample_fraction=0.5,
+                 honesty=False,
+                 honesty_fraction=0.5):
 
         # check and define the input parameters
         # check the number of trees in the forest
@@ -84,6 +103,60 @@ class OrderedForest:
             # raise value error
             raise ValueError("max_features must be a float"
                              ", got %s" % max_features)
+        
+        # check whether to sample with replacement
+        if isinstance(replace, bool):
+            # assign the input value
+            self.replace = replace
+        else:
+            # raise value error
+            raise ValueError("replace must be of type boolean"
+                             ", got %s" % replace)
+        
+        # check subsampling fraction
+        if isinstance(sample_fraction, float):
+            # check if its within (0,1]
+            if (sample_fraction > 0 and sample_fraction <= 1):
+                # assign the input value
+                self.sample_fraction = sample_fraction
+            else:
+                # raise value error
+                raise ValueError("sample_fraction must be within (0,1]"
+                                 ", got %s" % sample_fraction)
+        else:
+            # raise value error
+            raise ValueError("sample_fraction must be a float"
+                             ", got %s" % sample_fraction)
+
+        # check whether to implement honesty
+        if isinstance(honesty, bool):
+            # assign the input value
+            self.honesty = honesty
+        else:
+            # raise value error
+            raise ValueError("honesty must be of type boolean"
+                             ", got %s" % honesty)
+        
+        # check honesty fraction
+        if isinstance(honesty_fraction, float):
+            # check if its within (0,1]
+            if (honesty_fraction > 0 and honesty_fraction < 1):
+                # assign the input value
+                self.honesty_fraction = honesty_fraction
+            else:
+                # raise value error
+                raise ValueError("honesty_fraction must be within (0,1)"
+                                 ", got %s" % honesty_fraction)
+        else:
+            # raise value error
+            raise ValueError("honesty_fraction must be a float"
+                             ", got %s" % honesty_fraction)
+
+        # Honesty only possible if replace==False
+        if (honesty==True and replace==True):
+            # raise value error
+            raise ValueError("Honesty works only when sampling without " 
+                             "replacement. Set replace=False and run again.")
 
         # initialize orf
         self.forest = None
@@ -131,24 +204,75 @@ class OrderedForest:
         forests = {}
         # create an empty dictionary to save the predictions
         probs = {}
-
+        # create an empty dictionary to save the fitted values
+        fitted = {}
+        # generate honest estimation sample
+        if self.honesty==True:
+            X_tr, X_est, y_tr, y_est = train_test_split(X, y, 
+                                                        test_size=self.honesty_fraction)
+        else:
+            X_tr = X
+            y_tr = y
         # estimate random forest on each class outcome except the last one
         for class_idx in range(1, nclass, 1):
             # create binary outcome indicator for the outcome in the forest
-            outcome_ind = (y <= class_idx) * 1
-            # call rf from scikit learn and save it in dictionary
-            forests[class_idx] = RandomForestRegressor(
-                n_estimators=self.n_estimators,
-                min_samples_leaf=self.min_samples_leaf,
-                max_features=self.max_features,
-                oob_score=True)
-            # fit the model with the binary outcome
-            forests[class_idx].fit(X=X, y=outcome_ind)
-            # get the in-sample predictions, i.e. the out-of-bag predictions
-            probs[class_idx] = pd.Series(forests[class_idx].oob_prediction_,
-                                         name=labels[class_idx - 1],
-                                         index=X.index)
-
+            outcome_ind = (y_tr <= class_idx) * 1
+            # check whether to do subsamplign or not
+            if self.replace==True:
+                # call rf from scikit learn and save it in dictionary
+                forests[class_idx] = RandomForestRegressor(
+                    n_estimators=self.n_estimators,
+                    min_samples_leaf=self.min_samples_leaf,
+                    max_features=self.max_features,
+                    max_samples=self.sample_fraction,
+                    oob_score=True)
+                # fit the model with the binary outcome
+                forests[class_idx].fit(X=X_tr, y=outcome_ind)
+                # get the in-sample predictions, i.e. the out-of-bag predictions
+                probs[class_idx] = pd.Series(forests[class_idx].oob_prediction_,
+                                             name=labels[class_idx - 1],
+                                             index=X_tr.index)
+            else:
+                # call rf from econML and save it in dictionary
+                forests[class_idx] = RegressionForest(
+                    n_estimators=self.n_estimators,
+                    min_samples_leaf=self.min_samples_leaf,
+                    max_features=self.max_features,
+                    max_samples=self.sample_fraction)
+                # fit the model with the binary outcome
+                forests[class_idx].fit(X=X_tr, y=outcome_ind)
+                if self.honesty==False:
+                    # get the in-sample predictions, i.e. the out-of-bag predictions
+                    probs[class_idx] = pd.Series(forests[class_idx].oob_predict(X_tr).squeeze(),
+                                                 name=labels[class_idx - 1],
+                                                 index=X_tr.index)
+                else: 
+                    # Get leaf IDs for estimation set
+                    forest_apply = forests[class_idx].apply(X_est)
+                    # get the max number of leaves
+                    max_leaf = np.max(forest_apply)+1
+                    # generate dummies for each leaf ID (dim: (obs,trees,IDs))
+                    onehot = np.eye(max_leaf)[forest_apply]
+                    # create binary outcome indicator for the estimation sample
+                    outcome_ind_est = (y_est <= class_idx) * 1
+                    # Compute leaf sums for each leaf
+                    leaf_sums = np.dot(onehot.T, outcome_ind_est)
+                    # Determine number of observations per leaf
+                    leaf_n = np.sum(onehot, axis=0).T
+                    # Compute leaf means for each leaf -------> how to deal with division by zero?
+                    leaf_means = leaf_sums/leaf_n
+                    leaf_means = np.nan_to_num(leaf_means)
+                    fitted[class_idx] = leaf_means
+                    # Compute predictions for whole sample:
+                    # Get leaf IDs for estimation set
+                    forest_apply = forests[class_idx].apply(X)
+                    # generate dummies for each leaf ID (dim: (obs,trees,IDs))
+                    onehot = np.eye(max_leaf)[forest_apply]
+                    #by assigning leaf means to observations
+                    # y_hat[i,j] = sum_k onehot[i,j,k] * leaf_means[k,j]
+                    y_hat = np.einsum('ijk,kj->ij',onehot,leaf_means)
+                    # Average over trees
+                    probs[class_idx] = np.mean(y_hat, axis=1)
         # collect predictions into a dataframe
         probs = pd.DataFrame(probs)
         # create 2 distinct matrices with zeros and ones for easy subtraction
@@ -158,7 +282,6 @@ class OrderedForest:
         probs_1 = pd.concat([probs, pd.Series(np.ones(probs.shape[0]),
                                               index=probs.index, name=nclass)],
                             axis=1)
-
         # difference out the adjacent categories to singleout the class probs
         class_probs = probs_1 - probs_0.values
         # check if some probabilities become negative and set them to zero
@@ -169,7 +292,7 @@ class OrderedForest:
         class_probs.columns = labels
 
         # pack estimated forest and class predictions into output dictionary
-        self.forest = {'forests': forests, 'probs': class_probs}
+        self.forest = {'forests': forests, 'probs': class_probs, 'fitted': fitted}
         # compute prediction performance
         self.__performance(y)
         # check if performance metrics should be printed
@@ -206,16 +329,33 @@ class OrderedForest:
         labels = list(self.forest['probs'].columns)
         # get the number of outcome classes
         nclass = len(labels)
+        # get the number of trees
+        ntrees = self.n_estimators
+        # get the number of observations in X
+        nobs = X.shape[0]
         # create an empty dictionary to save the predictions
         probs = {}
 
         # estimate random forest on each class outcome except the last one
         for class_idx in range(1, nclass, 1):
-            # predict with the estimated forests out-of-sample
-            probs[class_idx] = pd.Series(forests[class_idx].predict(X=X),
+            if self.honesty==False:
+                # predict with the estimated forests out-of-sample
+                probs[class_idx] = pd.Series(forests[class_idx].predict(X=X).squeeze(),
                                          name=labels[class_idx - 1],
                                          index=X.index)
-
+            else:
+                # Get leaf means
+                leaf_means = self.forest['fitted'][class_idx]
+                # Get leaf IDs for test set
+                forest_apply = forests[class_idx].apply(X)
+                # generate grid to read out indices column by column
+                grid = np.meshgrid(np.arange(0, ntrees), np.arange(0, nobs))[0] 
+                # assign leaf means to indices
+                y_hat = leaf_means[forest_apply, grid]
+                # Average over trees
+                probs[class_idx] = pd.Series(np.mean(y_hat, axis=1),
+                                         name=labels[class_idx - 1],
+                                         index=X.index)
         # collect predictions into a dataframe
         probs = pd.DataFrame(probs)
         # create 2 distinct matrices with zeros and ones for easy subtraction
@@ -225,7 +365,6 @@ class OrderedForest:
         probs_1 = pd.concat([probs, pd.Series(np.ones(probs.shape[0]),
                                               index=probs.index, name=nclass)],
                             axis=1)
-
         # difference out the adjacent categories to singleout the class probs
         class_probs = probs_1 - probs_0.values
         # check if some probabilities become negative and set them to zero
