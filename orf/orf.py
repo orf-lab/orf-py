@@ -13,6 +13,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from econml.grf import RegressionForest
+import orf.honest_fit as honest_fit
+from joblib import Parallel, delayed
 
 
 # define OrderedForest class
@@ -43,6 +45,15 @@ class OrderedForest:
     honesty_fraction : TYPE: float
         DESCRIPTION: Share of observations belonging to honest sample not used
         for growing the forest. The default is 0.5.
+    n_jobs : TYPE: int or None
+        DESCRIPTION: The number of parallel jobs to be used for parallelism;
+        follows joblib semantics. n_jobs=-1 means all available cpu cores.
+        n_jobs=None means no parallelism. There is no parallelism implemented
+        for pred_method='numpy'. The default is -1.
+    pred_method : TYPE str, one of 'cython', 'loop' or 'numpy'
+        DESCRIPTION: Which method to use to compute honest predictions. The
+        default is 'cython'.
+
 
     Returns
     -------
@@ -56,7 +67,9 @@ class OrderedForest:
                  replace=True,
                  sample_fraction=0.5,
                  honesty=False,
-                 honesty_fraction=0.5):
+                 honesty_fraction=0.5,
+                 n_jobs=-1,
+                 pred_method='cython'):
 
         # check and define the input parameters
         # check the number of trees in the forest
@@ -158,6 +171,24 @@ class OrderedForest:
             raise ValueError("Honesty works only when sampling without "
                              "replacement. Set replace=False and run again.")
 
+        # check whether n_jobs is integer
+        if isinstance(n_jobs, int):
+            # assign the input value
+            self.n_jobs = n_jobs
+        else:
+            # raise value error
+            raise ValueError("n_jobs must be of type integer"
+                             ", got %s" % n_jobs)
+
+        # check whether pred_method is defined correctly
+        if (pred_method == 'cython' or pred_method == 'loop' or
+                pred_method == 'numpy'):
+            # assign the input value
+            self.pred_method = pred_method
+        else:
+            # raise value error
+            raise ValueError("pred_method must be of cython, loop or numpy"
+                             ", got %s" % pred_method)
         # initialize orf
         self.forest = None
         # initialize performance metrics
@@ -252,34 +283,70 @@ class OrderedForest:
                 else:
                     # Get leaf IDs for estimation set
                     forest_apply = forests[class_idx].apply(X_est)
-                    # get the max number of leaves
-                    max_leaf = np.max(forest_apply)+1
-                    # generate dummies for each leaf ID (dim: (obs,trees,IDs))
-                    onehot = np.eye(max_leaf)[forest_apply]
                     # create binary outcome indicator for the estimation sample
-                    outcome_ind_est = (y_est <= class_idx) * 1
-                    # Compute leaf sums for each leaf
-                    leaf_sums = np.dot(onehot.T, outcome_ind_est)
-                    # convert 0s to nans
-                    leaf_sums[leaf_sums == 0] = np.nan
-                    # Determine number of observations per leaf
-                    leaf_n = np.sum(onehot, axis=0).T
-                    # convert 0s to nans
-                    leaf_n[leaf_n == 0] = np.nan
-                    # Compute leaf means for each leaf
-                    leaf_means = leaf_sums/leaf_n
-                    # convert nans back to 0s
-                    leaf_means = np.nan_to_num(leaf_means)
-                    # assign the honest predictions, i.e. honest fitted values
-                    fitted[class_idx] = leaf_means
+                    outcome_ind_est = np.array((y_est <= class_idx) * 1)
+                    # compute maximum leaf id
+                    max_id = np.max(forest_apply)+1
+                    # Check whether to use cython implementation or not
+                    if self.pred_method == 'cython':
+                        # Loop over trees
+                        leaf_means = Parallel(n_jobs=self.n_jobs,
+                                              prefer="threads")(
+                            delayed(honest_fit.honest_fit)(
+                                forest_apply=forest_apply,
+                                outcome_ind_est=outcome_ind_est,
+                                trees=tree,
+                                max_id=max_id) for tree in range(
+                                    0, self.n_estimators))
+                        # assign honest predictions, i.e. honest fitted values
+                        fitted[class_idx] = np.vstack(leaf_means).T
+                    # Check whether to use loop implementation or not
+                    if self.pred_method == 'loop':
+                        # Loop over trees
+                        leaf_means = Parallel(n_jobs=self.n_jobs,
+                                              prefer="threads")(
+                            delayed(self.__honest_fit_func)(
+                                forest_apply=forest_apply,
+                                outcome_ind_est=outcome_ind_est,
+                                tree=tree,
+                                max_id=max_id) for tree in range(
+                                    0, self.n_estimators))
+                        # assign honest predictions, i.e. honest fitted values
+                        fitted[class_idx] = np.vstack(leaf_means).T
+                    # Check whether to use numpy implementation or not
+                    if self.pred_method == 'numpy':
+                        # https://stackoverflow.com/questions/36960320
+                        onehot = np.zeros(forest_apply.shape + (max_id,),
+                                          dtype=np.uint8)
+                        grid = np.ogrid[tuple(map(slice, forest_apply.shape))]
+                        grid.insert(2, forest_apply)
+                        onehot[tuple(grid)] = 1
+                        # onehot = np.eye(max_id)[forest_apply]
+                        # Compute leaf sums for each leaf
+                        leaf_sums = np.einsum('kji,k->ij', onehot,
+                                              outcome_ind_est)
+                        # convert 0s to nans
+                        leaf_sums = leaf_sums.astype(float)
+                        leaf_sums[leaf_sums == 0] = np.nan
+                        # Determine number of observations per leaf
+                        leaf_n = sum(onehot).T
+                        # convert 0s to nans
+                        leaf_n = leaf_n.astype(float)
+                        leaf_n[leaf_n == 0] = np.nan
+                        # Compute leaf means for each leaf
+                        leaf_means = leaf_sums/leaf_n
+                        # convert nans back to 0s
+                        leaf_means = np.nan_to_num(leaf_means)
+                        # assign the honest predictions, i.e. fitted values
+                        fitted[class_idx] = leaf_means
                     # Compute predictions for whole sample: both tr and est
                     # Get leaf IDs for the whole set of observations
                     forest_apply = forests[class_idx].apply(X)
-                    # generate dummies for each leaf ID (dim: (obs,trees,IDs))
-                    onehot = np.eye(max_leaf)[forest_apply]
-                    # by assigning leaf means to observations
-                    # y_hat[i,j] = sum_k onehot[i,j,k] * leaf_means[k,j]
-                    y_hat = np.einsum('ijk,kj->ij', onehot, leaf_means)
+                    # generate grid to read out indices column by column
+                    grid = np.meshgrid(np.arange(0, self.n_estimators),
+                                       np.arange(0, X.shape[0]))[0]
+                    # assign leaf means to indices
+                    y_hat = fitted[class_idx][forest_apply, grid]
                     # Average over trees
                     probs[class_idx] = np.mean(y_hat, axis=1)
         # collect predictions into a dataframe
@@ -615,3 +682,17 @@ class OrderedForest:
 
         # empty return
         return None
+
+    def __honest_fit_func(self, forest_apply, outcome_ind_est, tree, max_id):
+        # create an empty array to save the leaf means
+        leaf_means = np.empty(max_id)
+        # loop over leaf indices
+        for idx in range(0, max_id):
+            # get row numbers of obs with this leaf index
+            row_idx = np.where(forest_apply[:, tree] == idx)
+            # Compute mean of outcome of these obs
+            if row_idx[0].size == 0:
+                leaf_means[idx] = 0
+            else:
+                leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
+        return leaf_means

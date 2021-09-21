@@ -11,7 +11,7 @@ Showcase application of the Ordered Forest estimator.
 import pandas as pd
 import os
 import numpy as np
-path="C:/Users/FMuny/Git_projects/OrderedForest"
+path="D:\switchdrive\Projects\ORF_Python\ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -30,7 +30,8 @@ features = odata.drop('Y', axis=1)
 np.random.seed(999)
 # initiate the class with tuning parameters
 oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.5,
-                        replace=False, sample_fraction=0.5, honesty=True)
+                        replace=False, sample_fraction=0.5, honesty=True,
+                        n_jobs=-1, pred_method='cython')
 # fit the model
 forest_fit = oforest.fit(X=features, y=outcome)
 # predict ordered probabilities
