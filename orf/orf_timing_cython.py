@@ -69,7 +69,7 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
     return pd.DataFrame(X), pd.Series(Y)
 
 
-sample_sizes = [80000]
+sample_sizes = [1000]
 time_table = {}
 
 for n_sample in sample_sizes:
@@ -79,50 +79,50 @@ for n_sample in sample_sizes:
                                      cat_cat=3)
 
     # 0.) How fast is fitting two forests in econML?
-    #forest = RegressionForest(n_estimators=1000, min_samples_leaf=5,
-    #                          max_features=0.5, max_samples=0.5, honest=False)
-    #test_0 = %timeit -o forest.fit(X=features, y=outcome)
+    forest = RegressionForest(n_estimators=1000, min_samples_leaf=5,
+                              max_features=0.5, max_samples=0.5, honest=False)
+    test_0 = %timeit -o forest.fit(X=features.iloc[:np.ceil(n_sample/2).astype(int), :], y=outcome.iloc[:np.ceil(n_sample/2).astype(int)])
 
-    # 1.) How fast is Python implementation without Parallelization
-    #oforest1 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
-    #                         max_features=0.5, replace=False,
-    #                         sample_fraction=0.5, honesty=True,
-    #                         n_jobs=1, pred_method='numpy')
-    #test_1 = %timeit -o oforest1.fit(X=features, y=outcome)
+    # 1.)
+    oforest1 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy')
+    test_1 = %timeit -o oforest1.fit(X=features, y=outcome)
 
-    # 2.) How fast is Python implementation without Parallelization
-    #oforest2 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
-    #                         max_features=0.5, replace=False,
-    #                         sample_fraction=0.5, honesty=True,
-    #                         n_jobs=1, pred_method='loop')
-    #test_2 = %timeit -o oforest2.fit(X=features, y=outcome)
+    # 2.)
+    oforest2 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy_loop')
+    test_2 = %timeit -o oforest2.fit(X=features, y=outcome)
 
-    # 3.) How fast is Python implementation with Parallelization
-    #oforest3 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
-    #                         max_features=0.5, replace=False,
-    #                         sample_fraction=0.5, honesty=True,
-    #                         n_jobs=-1, pred_method='loop')
-    #test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
+    # 3.)
+    oforest3 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy_sparse')
+    test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
 
-    # 4.) How fast is Cython implementation without Parallelization
+    # 4.)
     oforest4 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=1, pred_method='cython')
+                             n_jobs=1, pred_method='loop')
     test_4 = %timeit -o oforest4.fit(X=features, y=outcome)
 
-    # 5.) How fast is Cython implementation with Parallelization
+    # 5.)
     oforest5 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=-1, pred_method='cython')
+                             n_jobs=4, pred_method='cython')
     test_5 = %timeit -o oforest5.fit(X=features, y=outcome)
 
-    time_table[n_sample] = [test_0.average*2, math.nan, test_2.average,
+    time_table[n_sample] = [test_0.average*2, test_1.average, test_2.average,
                             test_3.average, test_4.average, test_5.average]
 
-pd.DataFrame(time_table, index=['2 x econML', 'numpy', 'loop', 'loop par',
-                                'cython', 'cython par']).T
+pd.DataFrame(time_table, index=['2 x econML', 'numpy', 'numpy_loop',
+                                'numpy_sparse', 'loop', 'cython']).T
 
 
 """
@@ -134,5 +134,98 @@ n      2 x econML      numpy       loop    loop par     cython  cython par
 20000   56.749016  97.639873  60.991867  108.089989  62.723277   53.061945
 40000   58.343502        NaN 153.837272  257.034573  192.14841  202.482050
 80000   ...takes forever..................................................
+
+
+      2 x econML      numpy   numpy_loop  numpy_sparse      loop   cython
+1000    2.789039   3.385252     4.984847      4.903206  5.007984  4.07698
+20000   8.752583  55.862967    29.670385     33.555659  58.27305  59.338289
+100000 91.609554              149.250421    169.820621
+
+      2 x econML  numpy_loop  numpy_sparse  numpy_sparse2
+1000    1.503623    3.305515      2.658488      2.7687940
+20000   7.128304   19.515624     21.770787      20.517271
+100000 58.246735  110.120471    135.083053     128.428011
 """
 
+sample_sizes = [1000]
+time_table = {}
+
+for n_sample in sample_sizes:
+    # Generate data set
+    features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+
+    # 0.) How fast is fitting two forests in econML?
+    forest = RegressionForest(n_estimators=1000, min_samples_leaf=5,
+                              max_features=0.5, max_samples=0.5, honest=False)
+    test_0 = %timeit -o forest.fit(X=features.iloc[:np.ceil(n_sample/2).astype(int), :], y=outcome.iloc[:np.ceil(n_sample/2).astype(int)])
+
+    """# 1.)
+    oforest1 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy')
+    test_1 = %timeit -o oforest1.fit(X=features, y=outcome)"""
+
+    # 2.)
+    oforest2 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy_loop')
+    test_2 = %timeit -o oforest2.fit(X=features, y=outcome)
+
+    # 3.)
+    oforest3 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy_sparse')
+    test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
+
+    # 4.)
+    oforest4 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='numpy_sparse2')
+    test_4 = %timeit -o oforest4.fit(X=features, y=outcome)
+
+    """# 5.)
+    oforest5 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                             max_features=0.5, replace=False,
+                             sample_fraction=0.5, honesty=True,
+                             n_jobs=1, pred_method='cython')
+    test_5 = %timeit -o oforest5.fit(X=features, y=outcome)
+
+    time_table[n_sample] = [test_0.average*2, test_1.average, test_2.average,
+                            test_3.average, test_4.average, test_5.average]"""
+    time_table[n_sample] = [test_0.average*2, test_2.average,
+                            test_3.average, test_4.average]
+
+pd.DataFrame(time_table, index=['2 x econML', 'numpy_loop',
+                                'numpy_sparse', 'numpy_sparse2']).T
+
+
+# Test inference true vs false
+features, outcome = example_data(seed=123, n=1000, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+oforest2 = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                         max_features=0.5, replace=False,
+                         sample_fraction=0.5, honesty=True,
+                         n_jobs=1, pred_method='numpy_loop',
+                         inference=True, random_state=123)
+test_2 = %timeit -o oforest2.fit(X=features, y=outcome)
+
+
+oforest3 = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                         max_features=0.5, replace=False,
+                         sample_fraction=0.5, honesty=True,
+                         n_jobs=1, pred_method='numpy_loop',
+                         inference=False, random_state=123)
+test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
+
+"""
+      inference=True      inferenc=False
+1000    7.3019249857       1.57399261428
+10000
+"""

@@ -31,7 +31,7 @@ np.random.seed(999)
 # initiate the class with tuning parameters
 oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.5,
                         replace=False, sample_fraction=0.5, honesty=True,
-                        n_jobs=-1, pred_method='cython')
+                        n_jobs=-1, pred_method='numpy_loop', inference=False)
 # fit the model
 forest_fit = oforest.fit(X=features, y=outcome)
 # predict ordered probabilities
