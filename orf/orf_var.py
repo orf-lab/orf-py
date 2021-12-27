@@ -1,6 +1,15 @@
-# Hard-coded data to test variance computation in R vs. python
+"""
+orf: Ordered Random Forests.
+
+Python implementation of the Ordered Forest as in Lechner & Okasa (2019).
+
+Comparison of the Variance Computation.
+"""
+
+# load libraries
 import numpy as np
 
+# Hard-coded data to test variance computation in R vs. python
 probs1 = np.array((0.569929,0.457652,0.200977,0.163428,0.321162,0.187856,0.557985,0.202383,0.430742,0.24974,0.196137))
 probs2 = np.array((0.894521,0.86706,0.609612,0.515869,0.681767,0.511826,0.915146,0.556205,0.793036,0.682363,0.641027))
 
@@ -121,3 +130,20 @@ def honest_variance(probs, weights, outcome_binary, nclass,
                 class_idx].reshape(-1, 1) - honest_covariance[
                     class_idx].reshape(-1, 1)
     return honest_variance_final
+
+
+# compute the variances
+orf_var_python = honest_variance(probs=probs, weights=honest_weights,
+                                 outcome_binary=Y_ind_honest, nclass=nclass,
+                                 n_est=n_est, n_samples=n_samples)
+
+# load the variances computed in R
+orf_var_R = np.genfromtxt('orf_var_R.csv', delimiter=',')
+# delete the 0th row
+orf_var_R = np.delete(orf_var_R, (0), axis=0)
+
+# check if the two arrays are identical (at the 10th decimal point)
+if (np.round(orf_var_python, 10) == np.round(orf_var_R, 10)).all():
+    print('Variance computation in Python is the same as in R.')
+else:
+    print('Variance computation in Python is NOT the same as in R!')

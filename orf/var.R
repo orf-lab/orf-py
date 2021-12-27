@@ -1,21 +1,21 @@
-#' Get ORF Variance
+#' Predict ORF Variance
 #'
-#' get variance of ordered random forest predictions based on honest sample
+#' predict variance of ordered random forest predictions based on honest sample
 #' splitting as described in Lechner (2018)
 #'
 #' @param honest_pred list of vectors of honest forest predictions
 #' @param honest_weights list of n x n matrices of honest forest weights
-#' @param train_pred list of vectors of honest forests predictions from train sample
-#' @param train_weights list of vectors of honest forests predictions from train sample
 #' @param Y_ind_honest list of vectors of 0-1 outcomes for the honest sample
 #'
 #' @return vector of ORF variances
 #'
 #' @keywords internal
 #'
-#'
-#'
 
+# set the directory to the one of the source file (requires Rstudio)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+# prepare comparison data
 honest_pred = list()
 honest_pred[[1]] = c(0.569929,
                    0.457652,
@@ -99,14 +99,11 @@ Y_ind_honest[[2]] = c(1,
 )
 
 
-get_orf_variance <- function(honest_pred, honest_weights, train_pred, train_weights, Y_ind_honest) {
+pred_orf_variance <- function(honest_pred, honest_weights, Y_ind_honest) {
   
   # ----------------------------------------------------------------------------------- #
   
-  # first get honest and train rownames
-  rows_honest_data <- as.numeric(rownames(honest_pred[[1]]))
-
-  # get also categories
+  # get categories
   categories <- seq(1:(length(Y_ind_honest)+1))
   
   # ----------------------------------------------------------------------------------- #
@@ -114,9 +111,9 @@ get_orf_variance <- function(honest_pred, honest_weights, train_pred, train_weig
   ## single variances computation
   # compute the conditional means (predictions): already have this as forest_pred
   # divide it by N to get the "mean"
-  honest_pred_mean <- lapply(honest_pred, function(x) x/length(honest_pred[[1]]))
+  honest_pred_mean <- lapply(honest_pred, function(x) x/length(Y_ind_honest[[1]]))
   
-  # calculate standard multiplication of weights and outcomes: honest_weights*y_ind_honest
+  # calculate standard multiplication of weights and outcomes: honest_weights*y_ind_honest (note with seq_along: as many rows as honest_pred or honest_weights)
   honest_multi <- mapply(function(x,y) lapply(seq_along(x[, 1]), function(i) x[i, ] * y), honest_weights, Y_ind_honest, SIMPLIFY = FALSE)
   
   # subtract the mean from each obs i
@@ -125,29 +122,28 @@ get_orf_variance <- function(honest_pred, honest_weights, train_pred, train_weig
   ## now do the single variances for each category m
   # square the demeaned
   honest_multi_demeaned_sq <- lapply(honest_multi_demeaned, function(x) lapply(x, function(x) x^2))
-
+  
   # sum all obs i together
   honest_multi_demeaned_sq_sum <- lapply(honest_multi_demeaned_sq, function(x) lapply(x, function(x) sum(x)))
   
   # multiply by N/N-1 (normalize)
   honest_multi_demeaned_sq_sum_norm <- lapply(honest_multi_demeaned_sq_sum, function(x) lapply(x, function(x) x*(length(honest_pred[[1]])/(length(honest_pred[[1]])-1)) ))
-
+  
   # put it into a shorter named object
   honest_variance <- honest_multi_demeaned_sq_sum_norm
-
   
   # ----------------------------------------------------------------------------------- #
   
-  ## covariances computation
+  ##  covariances computation
   # multiply forest_var_multi_demeaned according to formula for covariance (shifted categories needed for computational convenience)
   # honest sample
-  honest_multi_demeaned_0_last <- append(honest_multi_demeaned, list(rep(list(matrix(0, ncol = length(honest_multi_demeaned[[1]][[1]]), nrow =1)), length(honest_multi_demeaned[[1]]) )))
-  honest_multi_demeaned_0_first <- append(list(rep(list(matrix(0, ncol = length(honest_multi_demeaned[[1]][[1]]), nrow = 1)), length(honest_multi_demeaned[[1]]) )), honest_multi_demeaned)
+  honest_multi_demeaned_0_last <- append(honest_multi_demeaned, list(rep(list(rep(0, length(honest_multi_demeaned[[1]][[1]]))), length(honest_multi_demeaned[[1]]))))
+  honest_multi_demeaned_0_first <- append(list(rep(list(rep(0, length(honest_multi_demeaned[[1]][[1]]))), length(honest_multi_demeaned[[1]]))), honest_multi_demeaned)
   
-    # compute the multiplication of category m with m-1 according to the covariance formula
+  # compute the multiplication of category m with m-1 according to the covariance formula
   honest_multi_demeaned_cov <- mapply(function(x,y) mapply(function(x,y) x*y, x, y, SIMPLIFY = FALSE), honest_multi_demeaned_0_first, honest_multi_demeaned_0_last, SIMPLIFY = FALSE)
   
-    # sum all obs i together
+  # sum all obs i together
   honest_multi_demeaned_cov_sum <- lapply(honest_multi_demeaned_cov, function(x) lapply(x, function(x) sum(x)))
   
   # multiply by N/N-1 (normalize)
@@ -156,35 +152,28 @@ get_orf_variance <- function(honest_pred, honest_weights, train_pred, train_weig
   # multiply by 2
   honest_multi_demeaned_cov_sum_norm_mult2 <- lapply(honest_multi_demeaned_cov_sum_norm, function(x) lapply(x, function(x) x*2 ))
   
-  
   # put it into a shorter named object
   honest_covariance <- honest_multi_demeaned_cov_sum_norm_mult2
-
+  
   # ----------------------------------------------------------------------------------- #
   
   ## put everything together according to the whole variance formula
   # shift variances accordingly for ease of next computations (covariance already has the desired format)
   # honest sample
-  honest_variance_last <- append(honest_variance, list(rep(list(0), length(honest_multi_demeaned[[1]]) ))) # append zero element list
-  honest_variance_first <- append(list(rep(list(0), length(honest_multi_demeaned[[1]]) )), honest_variance) # prepend zero element list
-  
+  honest_variance_last <- append(honest_variance, list(rep(list(0), length(honest_multi_demeaned[[1]])))) # append zero element list
+  honest_variance_first <- append(list(rep(list(0), length(honest_multi_demeaned[[1]]))), honest_variance) # prepend zero element list
   
   # put everything together according to formula: var_last + var_first - cov
   honest_variance_final <- mapply(function(x,y,z) mapply(function(x,y,z) x+y-z, x, y, z, SIMPLIFY = FALSE), honest_variance_last, honest_variance_first, honest_covariance, SIMPLIFY = FALSE)
-  
   
   ## output for final variances
   # coerce to a matrix
   honest_var <- sapply(honest_variance_final, function(x) sapply(x, function(x) as.matrix(x)))
   
+  # ----------------------------------------------------------------------------------- #
   
-  ## put it together according to rownames
-  rownames(honest_var) <- rows_honest_data # rownames
-  rownames(train_var) <- rows_train_data # rownames
-  # combine and sort
-  forest_variance <- rbind(honest_var, train_var)
-  # sort according to rownames
-  forest_variance <- forest_variance[order(as.numeric(row.names(forest_variance))), ]
+  # save as forest_var
+  forest_variance <- honest_var
   
   # add names
   colnames(forest_variance) <- sapply(categories, function(x) paste("Category", x, sep = " "))
@@ -199,4 +188,10 @@ get_orf_variance <- function(honest_pred, honest_weights, train_pred, train_weig
   # ----------------------------------------------------------------------------------- #
   
 }
+
+# get the variances
+orf_var_R <- pred_orf_variance(honest_pred, honest_weights, Y_ind_honest)
+
+# export the variances into a csv file
+write.csv(orf_var_R, file = 'orf_var_R.csv', row.names = FALSE)
 
