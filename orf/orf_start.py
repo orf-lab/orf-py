@@ -7,7 +7,8 @@ import pandas as pd
 import os
 import numpy as np
 import timeit
-path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+# path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest

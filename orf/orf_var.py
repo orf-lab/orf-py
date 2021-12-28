@@ -53,9 +53,18 @@ nclass = 3
 n_est = len(outcome_binary[1])
 n_samples = len(honest_pred[1])
 
+# train and honest indices
+ind_tr = [0,1,2,3,4,5]
+ind_est = [6,7,8,9,10]
+
+# honest binary outcome
+outcome_binary_est = {1: Y_ind_1[ind_est], 2: Y_ind_2[ind_est]}
 
 # Function to compute variance of predictions.
 # -> Does the N in the formula refer to n_samples or to n_est?
+# -> Does the N in the formula refer to n_samples or to n_est?
+# -> This depends on which data is passed to the function:
+# here it should always be n_est if it is out-of-sample, i.e. len(probs)
 def honest_variance(probs, weights, outcome_binary, nclass,
                     n_est, n_samples):
     # ### (single class) Variance computation:
@@ -131,8 +140,179 @@ def honest_variance(probs, weights, outcome_binary, nclass,
                     class_idx].reshape(-1, 1)
     return honest_variance_final
 
+# Function to compute variance of predictions.
+# -> Does the N in the formula refer to n_samples or to n_est?
+# -> This depends on which data is passed to the function:
+# for train sample N=n_tr and for honest sample N=n_est
+def get_honest_variance(probs, weights, outcome_binary, nclass,
+                        ind_tr, ind_est):
+    """Compute the variance of predictions (in-sample)."""
+    # get the number of observations in train and honest sample
+    n_est = len(ind_est)
+    n_tr = len(ind_tr)
+    # ### (single class) Variance computation:
+    # ## Create storage containers
+    # honest sample
+    honest_multi_demeaned = {}
+    honest_variance = {}
+    # train sample
+    train_multi_demeaned = {}
+    train_variance = {}
+    # Loop over classes
+    for class_idx in range(1, nclass, 1):
+        # divide predictions by N to obtain mean after summing up
+        # honest sample
+        honest_pred_mean = np.reshape(
+            probs[ind_est, (class_idx-1)] / n_est, (-1, 1))
+        # train sample
+        train_pred_mean = np.reshape(
+            probs[ind_tr, (class_idx-1)] / n_tr, (-1, 1))
+        # calculate standard multiplication of weights and outcomes
+        # outcomes need to be from the honest sample (outcome_binary_est)
+        # for both honest and train multi
+        # honest sample
+        honest_multi = np.multiply(
+            weights[class_idx][ind_est, :][:, ind_est],  # subset honest weight
+            outcome_binary[class_idx].reshape((1, -1)))
+        # train sample
+        train_multi = np.multiply(
+            weights[class_idx][ind_tr, :][:, ind_est],  # subset honest weights
+            outcome_binary[class_idx].reshape((1, -1)))
+        # subtract the mean from each obs i
+        # honest sample
+        honest_multi_demeaned[class_idx] = honest_multi - honest_pred_mean
+        # train sample
+        train_multi_demeaned[class_idx] = train_multi - train_pred_mean
+        # compute the square
+        # honest sample
+        honest_multi_demeaned_sq = np.square(
+            honest_multi_demeaned[class_idx])
+        # train sample
+        train_multi_demeaned_sq = np.square(
+            train_multi_demeaned[class_idx])
+        # sum over all i in the corresponding sample
+        # honest sample
+        honest_multi_demeaned_sq_sum = np.sum(
+            honest_multi_demeaned_sq, axis=1)
+        # train sample
+        train_multi_demeaned_sq_sum = np.sum(
+            train_multi_demeaned_sq, axis=1)
+        # multiply by N/N-1 (normalize), N for the corresponding sample
+        # honest sample
+        honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
+                                      (n_est/(n_est-1)))
+        # train sample
+        train_variance[class_idx] = (train_multi_demeaned_sq_sum *
+                                     (n_tr/(n_tr-1)))
 
-# compute the variances
+    # ### Covariance computation:
+    # Shift categories for computational convenience
+    # Postpend matrix of zeros
+    # honest sample
+    honest_multi_demeaned_0_last = honest_multi_demeaned
+    honest_multi_demeaned_0_last[nclass] = np.zeros(
+        honest_multi_demeaned_0_last[1].shape)
+    # train sample
+    train_multi_demeaned_0_last = train_multi_demeaned
+    train_multi_demeaned_0_last[nclass] = np.zeros(
+        train_multi_demeaned_0_last[1].shape)
+    # Prepend matrix of zeros
+    # honest sample
+    honest_multi_demeaned_0_first = {}
+    honest_multi_demeaned_0_first[1] = np.zeros(
+        honest_multi_demeaned[1].shape)
+    # train sample
+    train_multi_demeaned_0_first = {}
+    train_multi_demeaned_0_first[1] = np.zeros(
+        train_multi_demeaned[1].shape)
+    # Shift existing matrices by 1 class
+    # honest sample
+    for class_idx in range(1, nclass, 1):
+        honest_multi_demeaned_0_first[
+            class_idx+1] = honest_multi_demeaned[class_idx]
+    # train sample
+    for class_idx in range(1, nclass, 1):
+        train_multi_demeaned_0_first[
+            class_idx+1] = train_multi_demeaned[class_idx]
+    # Create storage container
+    honest_covariance = {}
+    train_covariance = {}
+    # Loop over classes
+    for class_idx in range(1, nclass+1, 1):
+        # multiplication of category m with m-1
+        # honest sample
+        honest_multi_demeaned_cov = np.multiply(
+            honest_multi_demeaned_0_first[class_idx],
+            honest_multi_demeaned_0_last[class_idx])
+        # train sample
+        train_multi_demeaned_cov = np.multiply(
+            train_multi_demeaned_0_first[class_idx],
+            train_multi_demeaned_0_last[class_idx])
+        # sum all obs i in honest sample
+        honest_multi_demeaned_cov_sum = np.sum(
+            honest_multi_demeaned_cov, axis=1)
+        # sum all obs i in train sample
+        train_multi_demeaned_cov_sum = np.sum(
+            train_multi_demeaned_cov, axis=1)
+        # multiply by (N/N-1)*2
+        # honest sample
+        honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
+            n_est/(n_est-1))
+        # train sample
+        train_covariance[class_idx] = train_multi_demeaned_cov_sum*2*(
+            n_tr/(n_tr-1))
+
+    # ### Put everything together
+    # Shift categories for computational convenience
+    # Postpend matrix of zeros
+    # honest sample
+    honest_variance_last = honest_variance
+    honest_variance_last[nclass] = np.zeros(honest_variance_last[1].shape)
+    # train sample
+    train_variance_last = train_variance
+    train_variance_last[nclass] = np.zeros(train_variance_last[1].shape)
+    # Prepend matrix of zeros
+    # honest sample
+    honest_variance_first = {}
+    honest_variance_first[1] = np.zeros(honest_variance[1].shape)
+    # train sample
+    train_variance_first = {}
+    train_variance_first[1] = np.zeros(train_variance[1].shape)
+    # Shift existing matrices by 1 class
+    for class_idx in range(1, nclass, 1):
+        # honest sample
+        honest_variance_first[class_idx+1] = honest_variance[class_idx]
+        # train sample
+        train_variance_first[class_idx+1] = train_variance[class_idx]
+    # Create storage container
+    honest_variance_final = np.empty((n_est, nclass))
+    train_variance_final = np.empty((n_tr, nclass))
+    # Compute final variance according to: var_last + var_first - cov
+    for class_idx in range(1, nclass+1, 1):
+        # honest sample
+        honest_variance_final[
+            :, (class_idx-1):class_idx] = honest_variance_last[
+                class_idx].reshape(-1, 1) + honest_variance_first[
+                class_idx].reshape(-1, 1) - honest_covariance[
+                    class_idx].reshape(-1, 1)
+        # train sample
+        train_variance_final[
+            :, (class_idx-1):class_idx] = train_variance_last[
+                class_idx].reshape(-1, 1) + train_variance_first[
+                class_idx].reshape(-1, 1) - train_covariance[
+                    class_idx].reshape(-1, 1)
+    # put honest and train sample together
+    variance_final = np.vstack((honest_variance_final,
+                                train_variance_final))
+    # Combine indices
+    ind_all = np.hstack((ind_est, ind_tr))
+    # Sort variance_final according to indices in ind_all
+    variance_final = variance_final[ind_all.argsort(), :]
+    # retunr final variance
+    return variance_final
+
+
+# compute the variances (out-of-sample)
 orf_var_python = honest_variance(probs=probs, weights=honest_weights,
                                  outcome_binary=Y_ind_honest, nclass=nclass,
                                  n_est=n_est, n_samples=n_samples)
@@ -147,3 +327,49 @@ if (np.round(orf_var_python, 10) == np.round(orf_var_R, 10)).all():
     print('Variance computation in Python is the same as in R.')
 else:
     print('Variance computation in Python is NOT the same as in R!')
+
+# compute the variances (in-sample)
+orf_var_python_in = get_honest_variance(probs=probs, weights=honest_weights,
+                                        outcome_binary=outcome_binary_est,
+                                        nclass=nclass,
+                                        ind_est=ind_est, ind_tr=ind_tr)
+
+# load the variances computed in R
+orf_var_R_in = np.genfromtxt('orf_var_R_in.csv', delimiter=',')
+# delete the 0th row
+orf_var_R_in = np.delete(orf_var_R_in, (0), axis=0)
+
+# check if the two arrays are identical (at the 10th decimal point)
+if (np.round(orf_var_python_in, 10) == np.round(orf_var_R_in, 10)).all():
+    print('Variance computation in Python is the same as in R in-sample.')
+else:
+    print('Variance computation in Python is NOT the same as in R in-sample !')
+
+# alternative using the same variance function but twice
+n_est = 5
+n_tr = 6
+# honest sample
+orf_var_python_honest = honest_variance(probs=probs[ind_est, :],
+   weights=dict([(key, honest_weights[key][ind_est, :][:, ind_est]) for key in range(1, nclass, 1)]),
+   outcome_binary=dict([(key, Y_ind_honest[key][ind_est]) for key in range(1, nclass, 1)]),
+   nclass=nclass, n_est=n_est, n_samples=n_est)
+# train sample
+orf_var_python_train = honest_variance(probs=probs[ind_tr, :],
+   weights=dict([(key, honest_weights[key][ind_tr, :][:, ind_est]) for key in range(1, nclass, 1)]),
+   outcome_binary=dict([(key, Y_ind_honest[key][ind_est]) for key in range(1, nclass, 1)]),
+   nclass=nclass, n_est=n_tr, n_samples=n_tr)
+# put honest and train sample together
+orf_var_python_in_combined = np.vstack((orf_var_python_honest,
+                                        orf_var_python_train))
+# Combine indices
+ind_all = np.hstack((ind_est, ind_tr))
+# Sort orf_var_python_in_combined according to indices in ind_all
+orf_var_python_in_combined = orf_var_python_in_combined[ind_all.argsort(), :]
+
+# check if the two arrays are identical (at the 10th decimal point)
+if (np.round(orf_var_python_in, 10) == np.round(orf_var_python_in_combined, 10)).all():
+    print('Variance computation using the long function is the same as using '
+          'the short one twice.')
+else:
+    print('Variance computation using the long function is NOT the same as '
+          'using the short one twice!')

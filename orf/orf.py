@@ -288,6 +288,7 @@ class OrderedForest:
         fitted = {}
         #  create an empty dictionary to save the binarized outcomes
         outcome_binary = {}
+        outcome_binary_est = {}
         #  create an empty dictionary to save the weights matrices
         weights = {}
         # generate honest estimation sample
@@ -354,6 +355,8 @@ class OrderedForest:
                     forest_apply = forests[class_idx].apply(X_est)
                     # create binary outcome indicator for est sample
                     outcome_ind_est = np.array((y_est <= class_idx) * 1)
+                    # save it into a dictionary for later use in variance
+                    outcome_binary_est[class_idx] = np.array(outcome_ind_est)
                     # compute maximum leaf id
                     max_id = np.max(forest_apply)+1
                     if self.inference:
@@ -574,11 +577,12 @@ class OrderedForest:
         # set the new column names according to specified class labels
         class_probs = pd.DataFrame(class_probs, columns=labels)
         # Compute variance of predicitons if inference = True
+        # outcome need to come from the honest sample here, outcome_binary_est
         if self.inference:
-            variance = self.honest_variance(probs=probs, weights=weights,
-                                            outcome_binary=outcome_binary,
-                                            nclass=nclass, n_est=n_est,
-                                            n_samples=n_samples)
+            variance = self.get_honest_variance(
+                probs=probs, weights=weights,
+                outcome_binary=outcome_binary_est,
+                nclass=nclass, ind_tr=ind_tr, ind_est=ind_est)
         else:
             variance = {}
         # pack estimated forest and class predictions into output dictionary
@@ -700,7 +704,7 @@ class OrderedForest:
         self.__xcheck(X)
         # get a copy to avoid SettingWithCopyWarning
         X_copy = X.copy()
-        
+
         # check the window argument
         if isinstance(window, float):
             # check if its within (0,1]
@@ -920,6 +924,7 @@ class OrderedForest:
         return None
 
     def honest_fit_func(self, forest_apply, outcome_ind_est, tree, max_id):
+        """Compute the honest leaf means using loop."""
         # create an empty array to save the leaf means
         leaf_means = np.empty(max_id)
         # loop over leaf indices
@@ -935,6 +940,7 @@ class OrderedForest:
 
     def honest_fit_numpy_func(self, forest_apply, outcome_ind_est, tree,
                               max_id):
+        """Compute the honest leaf means using numpy."""
         # create an empty array to save the leaf means
         leaf_means = np.zeros(max_id)
         # Create dummy matrix dim(n_est, max_id)
@@ -952,6 +958,7 @@ class OrderedForest:
     # -> Does the N in the formula refer to n_samples or to n_est?
     def honest_variance(self, probs, weights, outcome_binary, nclass,
                         n_est, n_samples):
+        """Compute the variance of predictions (out-of-sample)."""
         # ### (single class) Variance computation:
         # Create storage containers
         honest_multi_demeaned = {}
@@ -1024,3 +1031,174 @@ class OrderedForest:
                     class_idx].reshape(-1, 1) - honest_covariance[
                         class_idx].reshape(-1, 1)
         return honest_variance_final
+
+    # Function to compute variance of predictions.
+    # -> Does the N in the formula refer to n_samples or to n_est?
+    # -> This depends on which data is passed to the function:
+    # for train sample N=n_tr and for honest sample N=n_est
+    def get_honest_variance(self, probs, weights, outcome_binary, nclass,
+                            ind_tr, ind_est):
+        """Compute the variance of predictions (in-sample)."""
+        # get the number of observations in train and honest sample
+        n_est = len(ind_est)
+        n_tr = len(ind_tr)
+        # ### (single class) Variance computation:
+        # ## Create storage containers
+        # honest sample
+        honest_multi_demeaned = {}
+        honest_variance = {}
+        # train sample
+        train_multi_demeaned = {}
+        train_variance = {}
+        # Loop over classes
+        for class_idx in range(1, nclass, 1):
+            # divide predictions by N to obtain mean after summing up
+            # honest sample
+            honest_pred_mean = np.reshape(
+                probs[ind_est, (class_idx-1)] / n_est, (-1, 1))
+            # train sample
+            train_pred_mean = np.reshape(
+                probs[ind_tr, (class_idx-1)] / n_tr, (-1, 1))
+            # calculate standard multiplication of weights and outcomes
+            # outcomes need to be from the honest sample (outcome_binary_est)
+            # for both honest and train multi
+            # honest sample
+            honest_multi = np.multiply(
+                weights[class_idx][ind_est, :],
+                outcome_binary[class_idx].reshape((1, -1)))
+            # train sample
+            train_multi = np.multiply(
+                weights[class_idx][ind_tr, :],
+                outcome_binary[class_idx].reshape((1, -1)))
+            # subtract the mean from each obs i
+            # honest sample
+            honest_multi_demeaned[class_idx] = honest_multi - honest_pred_mean
+            # train sample
+            train_multi_demeaned[class_idx] = train_multi - train_pred_mean
+            # compute the square
+            # honest sample
+            honest_multi_demeaned_sq = np.square(
+                honest_multi_demeaned[class_idx])
+            # train sample
+            train_multi_demeaned_sq = np.square(
+                train_multi_demeaned[class_idx])
+            # sum over all i in the corresponding sample
+            # honest sample
+            honest_multi_demeaned_sq_sum = np.sum(
+                honest_multi_demeaned_sq, axis=1)
+            # train sample
+            train_multi_demeaned_sq_sum = np.sum(
+                train_multi_demeaned_sq, axis=1)
+            # multiply by N/N-1 (normalize), N for the corresponding sample
+            # honest sample
+            honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
+                                          (n_est/(n_est-1)))
+            # train sample
+            train_variance[class_idx] = (train_multi_demeaned_sq_sum *
+                                         (n_tr/(n_tr-1)))
+
+        # ### Covariance computation:
+        # Shift categories for computational convenience
+        # Postpend matrix of zeros
+        # honest sample
+        honest_multi_demeaned_0_last = honest_multi_demeaned
+        honest_multi_demeaned_0_last[nclass] = np.zeros(
+            honest_multi_demeaned_0_last[1].shape)
+        # train sample
+        train_multi_demeaned_0_last = train_multi_demeaned
+        train_multi_demeaned_0_last[nclass] = np.zeros(
+            train_multi_demeaned_0_last[1].shape)
+        # Prepend matrix of zeros
+        # honest sample
+        honest_multi_demeaned_0_first = {}
+        honest_multi_demeaned_0_first[1] = np.zeros(
+            honest_multi_demeaned[1].shape)
+        # train sample
+        train_multi_demeaned_0_first = {}
+        train_multi_demeaned_0_first[1] = np.zeros(
+            train_multi_demeaned[1].shape)
+        # Shift existing matrices by 1 class
+        # honest sample
+        for class_idx in range(1, nclass, 1):
+            honest_multi_demeaned_0_first[
+                class_idx+1] = honest_multi_demeaned[class_idx]
+        # train sample
+        for class_idx in range(1, nclass, 1):
+            train_multi_demeaned_0_first[
+                class_idx+1] = train_multi_demeaned[class_idx]
+        # Create storage container
+        honest_covariance = {}
+        train_covariance = {}
+        # Loop over classes
+        for class_idx in range(1, nclass+1, 1):
+            # multiplication of category m with m-1
+            # honest sample
+            honest_multi_demeaned_cov = np.multiply(
+                honest_multi_demeaned_0_first[class_idx],
+                honest_multi_demeaned_0_last[class_idx])
+            # train sample
+            train_multi_demeaned_cov = np.multiply(
+                train_multi_demeaned_0_first[class_idx],
+                train_multi_demeaned_0_last[class_idx])
+            # sum all obs i in honest sample
+            honest_multi_demeaned_cov_sum = np.sum(
+                honest_multi_demeaned_cov, axis=1)
+            # sum all obs i in train sample
+            train_multi_demeaned_cov_sum = np.sum(
+                train_multi_demeaned_cov, axis=1)
+            # multiply by (N/N-1)*2
+            # honest sample
+            honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
+                n_est/(n_est-1))
+            # train sample
+            train_covariance[class_idx] = train_multi_demeaned_cov_sum*2*(
+                n_tr/(n_tr-1))
+
+        # ### Put everything together
+        # Shift categories for computational convenience
+        # Postpend matrix of zeros
+        # honest sample
+        honest_variance_last = honest_variance
+        honest_variance_last[nclass] = np.zeros(honest_variance_last[1].shape)
+        # train sample
+        train_variance_last = train_variance
+        train_variance_last[nclass] = np.zeros(train_variance_last[1].shape)
+        # Prepend matrix of zeros
+        # honest sample
+        honest_variance_first = {}
+        honest_variance_first[1] = np.zeros(honest_variance[1].shape)
+        # train sample
+        train_variance_first = {}
+        train_variance_first[1] = np.zeros(train_variance[1].shape)
+        # Shift existing matrices by 1 class
+        for class_idx in range(1, nclass, 1):
+            # honest sample
+            honest_variance_first[class_idx+1] = honest_variance[class_idx]
+            # train sample
+            train_variance_first[class_idx+1] = train_variance[class_idx]
+        # Create storage container
+        honest_variance_final = np.empty((n_est, nclass))
+        train_variance_final = np.empty((n_tr, nclass))
+        # Compute final variance according to: var_last + var_first - cov
+        for class_idx in range(1, nclass+1, 1):
+            # honest sample
+            honest_variance_final[
+                :, (class_idx-1):class_idx] = honest_variance_last[
+                    class_idx].reshape(-1, 1) + honest_variance_first[
+                    class_idx].reshape(-1, 1) - honest_covariance[
+                        class_idx].reshape(-1, 1)
+            # train sample
+            train_variance_final[
+                :, (class_idx-1):class_idx] = train_variance_last[
+                    class_idx].reshape(-1, 1) + train_variance_first[
+                    class_idx].reshape(-1, 1) - train_covariance[
+                        class_idx].reshape(-1, 1)
+        # put honest and train sample together
+        variance_final = np.vstack((honest_variance_final,
+                                    train_variance_final))
+        # Combine indices
+        ind_all = np.hstack((ind_est, ind_tr))
+        # Sort variance_final according to indices in ind_all
+        variance_final = variance_final[ind_all.argsort(), :]
+        # retunr final variance
+        return variance_final

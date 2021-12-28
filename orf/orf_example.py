@@ -11,7 +11,8 @@ Showcase application of the Ordered Forest estimator.
 import pandas as pd
 import os
 import numpy as np
-path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+# path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -29,7 +30,7 @@ features = odata.drop('Y', axis=1)
 # Set seed
 np.random.seed(999)
 # initiate the class with tuning parameters
-oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.5,
+oforest = OrderedForest(n_estimators=500, min_samples_leaf=5, max_features=0.5,
                         replace=False, sample_fraction=0.5, honesty=True,
                         n_jobs=-1, pred_method='numpy_loop', inference=False)
 # fit the model
