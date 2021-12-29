@@ -579,10 +579,36 @@ class OrderedForest:
         # Compute variance of predicitons if inference = True
         # outcome need to come from the honest sample here, outcome_binary_est
         if self.inference:
-            variance = self.get_honest_variance(
-                probs=probs, weights=weights,
-                outcome_binary=outcome_binary_est,
-                nclass=nclass, ind_tr=ind_tr, ind_est=ind_est)
+            # prepare honest sample
+            probs_honest = probs[ind_est, :]
+            weights_honest = dict([(key, weights[key][ind_est, :])
+                                   for key in range(1, nclass, 1)])
+            # compute variance
+            variance_honest = self.honest_variance(
+                probs=probs_honest, weights=weights_honest,
+                outcome_binary=outcome_binary_est, nclass=nclass, n_est=n_est)
+            # prepare train sample
+            n_tr = len(ind_tr)
+            probs_train = probs[ind_tr, :]
+            weights_train = dict([(key, weights[key][ind_tr, :])
+                                  for key in range(1, nclass, 1)])
+            # compute variance
+            variance_train = self.honest_variance(
+                probs=probs_train, weights=weights_train,
+                outcome_binary=outcome_binary_est, nclass=nclass, n_est=n_tr)
+            # put honest and train variance together
+            variance = np.vstack((variance_honest, variance_train))
+            # Combine indices
+            ind_all = np.hstack((ind_est, ind_tr))
+            # Sort variance according to indices in ind_all
+            variance = variance[ind_all.argsort(), :]
+
+# =============================================================================
+#             variance = self.get_honest_variance(
+#                 probs=probs, weights=weights,
+#                 outcome_binary=outcome_binary_est,
+#                 nclass=nclass, ind_tr=ind_tr, ind_est=ind_est)
+# =============================================================================
         else:
             variance = {}
         # pack estimated forest and class predictions into output dictionary
@@ -956,8 +982,7 @@ class OrderedForest:
 
     # Function to compute variance of predictions.
     # -> Does the N in the formula refer to n_samples or to n_est?
-    def honest_variance(self, probs, weights, outcome_binary, nclass,
-                        n_est, n_samples):
+    def honest_variance(self, probs, weights, outcome_binary, nclass, n_est):
         """Compute the variance of predictions (out-of-sample)."""
         # ### (single class) Variance computation:
         # Create storage containers
@@ -1022,7 +1047,7 @@ class OrderedForest:
         for class_idx in range(1, nclass, 1):
             honest_variance_first[class_idx+1] = honest_variance[class_idx]
         # Create storage container
-        honest_variance_final = np.empty((n_samples, nclass))
+        honest_variance_final = np.empty((n_est, nclass))
         # Compute final variance according to: var_last + var_first - cov
         for class_idx in range(1, nclass+1, 1):
             honest_variance_final[
