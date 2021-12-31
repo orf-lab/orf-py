@@ -340,7 +340,9 @@ class OrderedForest:
                     max_features=self.max_features,
                     max_samples=self.sample_fraction,
                     random_state=self.random_state,
-                    subforest_size=2)
+                    honest=False, # default is True!
+                    inference=False, # default is True!
+                    subforest_size=1)
                 # fit the model with the binary outcome
                 forests[class_idx].fit(X=X_tr, y=outcome_ind)
                 # if no honesty, get the oob predictions
@@ -374,27 +376,30 @@ class OrderedForest:
                                                             :]
                         # generate storage matrix for weights
                         forest_out = np.zeros((n_samples, n_est))
-                        # Loop over trees
-                        for tree in range(self.n_estimators):
-                            # extract vectors of leaf IDs
-                            leaf_IDs_honest = forest_apply[:, tree]
-                            leaf_IDs_all = forest_apply_all[:, tree]
-                            # Generate onehot matrices
-                            onehot_honest = OneHotEncoder(
-                                sparse=True).fit_transform(
-                                    leaf_IDs_honest.reshape(-1, 1)).T
-                            onehot_all = OneHotEncoder(
-                                sparse=True).fit_transform(
-                                    leaf_IDs_all.reshape(-1, 1))
-                            # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
-                            tree_out = onehot_all.dot(onehot_honest).todense()
-                            # Get leaf sizes
-                            leaf_size = tree_out.sum(axis=1)
-                            # Compute weights
-                            tree_out = tree_out/leaf_size
-                            # add tree weights to overall forest weights
-                            forest_out = forest_out + tree_out
-                        """
+# =============================================================================
+#                         # Loop over trees
+#                         for tree in range(self.n_estimators):
+#                             # extract vectors of leaf IDs
+#                             leaf_IDs_honest = forest_apply[:, tree]
+#                             leaf_IDs_all = forest_apply_all[:, tree]
+#                             # Generate onehot matrices
+#                             onehot_honest = OneHotEncoder(
+#                                 sparse=True).fit_transform(
+#                                     leaf_IDs_honest.reshape(-1, 1)).T
+#                             onehot_all = OneHotEncoder(
+#                                 sparse=True).fit_transform(
+#                                     leaf_IDs_all.reshape(-1, 1))
+#                             # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+#                             tree_out = onehot_all.dot(onehot_honest).todense()
+#                             # Get leaf sizes
+#                             # leaf size only for honest sample !!!
+#                             leaf_size = tree_out.sum(axis=1)
+#                             # Compute weights
+#                             tree_out = tree_out/leaf_size
+#                             # add tree weights to overall forest weights
+#                             forest_out = forest_out + tree_out
+# =============================================================================
+
                         # Loop over trees (via loops)
                         for tree in range(self.n_estimators):
                             # extract vectors of leaf IDs
@@ -428,7 +433,84 @@ class OrderedForest:
                                         tree_out[i, :] / leaf_size)
                             # add tree weights to overall forest weights
                             forest_out += tree_out
-                        """
+
+# =============================================================================
+#                         # generate storage matrix for weights
+#                         n_tr = len(ind_tr)
+#                         forest_out_train = np.zeros((n_tr, n_est))
+#                         forest_out_honest = np.zeros((n_est, n_est))
+# 
+#                         # Loop over trees (via loops)
+#                         for tree in range(self.n_estimators):
+#                             # extract vectors of leaf IDs
+#                             leaf_IDs_honest = forest_apply[:, tree]
+#                             leaf_IDs_train = forest_apply_tr[:, tree]
+#                             # Compute leaf sizes in honest sample
+#                             unique, counts = np.unique(
+#                                 leaf_IDs_honest, return_counts=True)
+#                             # train sample
+#                             # generate storage matrices for weights
+#                             tree_out_train = np.empty((n_tr, n_est))
+#                             # Loop over train sample
+#                             for i in range(n_tr):
+#                                 # Loop over honest sample
+#                                 for j in range(n_est):
+#                                     # If leaf indices coincide...
+#                                     if (leaf_IDs_train[i] ==
+#                                             leaf_IDs_honest[j]):
+#                                         # ... assign 1 to weight matrix
+#                                         tree_out_train[i, j] = 1
+#                                     # else assign 0
+#                                     else:
+#                                         tree_out_train[i, j] = 0
+#                                 # Compute number of observations in this
+#                                 # leaf in the honest sample
+#                                 # leaf_size = np.sum(tree_out[i, :])
+#                                 leaf_size = counts[np.where(
+#                                     unique == leaf_IDs_train[i])]
+#                                 # If leaf size > 0 divide by leaf size
+#                                 if leaf_size > 0:
+#                                     tree_out_train[i, :] = (
+#                                         tree_out_train[i, :] / leaf_size)
+#                             # add tree weights to overall forest weights
+#                             forest_out_train += tree_out_train
+# 
+#                             # honest sample
+#                             # generate storage matrices for weights
+#                             tree_out_honest = np.empty((n_est, n_est))
+#                             # Loop over train sample
+#                             for i in range(n_tr):
+#                                 # Loop over honest sample
+#                                 for j in range(n_est):
+#                                     # If leaf indices coincide...
+#                                     if (leaf_IDs_honest[i] ==
+#                                             leaf_IDs_honest[j]):
+#                                         # ... assign 1 to weight matrix
+#                                         tree_out_honest[i, j] = 1
+#                                     # else assign 0
+#                                     else:
+#                                         tree_out_honest[i, j] = 0
+#                                 # Compute number of observations in this
+#                                 # leaf in the honest sample
+#                                 # leaf_size = np.sum(tree_out[i, :])
+#                                 leaf_size = counts[np.where(
+#                                     unique == leaf_IDs_honest[i])]
+#                                 # If leaf size > 0 divide by leaf size
+#                                 if leaf_size > 0:
+#                                     tree_out_honest[i, :] = (
+#                                         tree_out_honest[i, :] / leaf_size)
+#                             # add tree weights to overall forest weights
+#                             forest_out_honest += tree_out_honest
+# 
+#                         # combine train and honest sample
+#                         forest_out = np.vstack((forest_out_honest,
+#                                                 forest_out_train))
+#                         # Combine indices
+#                         ind_all = np.hstack((ind_est, ind_tr))
+#                         # Sort forest_out according to indices in ind_all
+#                         forest_out = forest_out[ind_all.argsort(), :]
+# =============================================================================
+
                         # Divide by the number of trees to obtain final weights
                         forest_out = forest_out / self.n_estimators
                         # Compute predictions and assign to probs vector

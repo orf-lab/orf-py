@@ -15,9 +15,9 @@ os.chdir(path)
 from orf.orf import OrderedForest
 
 # initiate the class with tuning parameters
-self = OrderedForest(n_estimators=100, min_samples_leaf=5, max_features=0.5,
+self = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3,
                         replace=False, sample_fraction=0.5, honesty=True,
-                        n_jobs=-1, pred_method='cython', inference=True)
+                        n_jobs=-1, pred_method='numpy_loop', inference=True)
 
 # Define function to produce data sets of different size
 def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
@@ -74,8 +74,13 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
 
 
 # Generate data set
-X, y = example_data(seed=123, n=500, p_cont=1, p_cat=1,
+X, y = example_data(seed=123, n=5000, p_cont=1, p_cat=1,
                     p_binary=1, noise=True, y_cat=3,
                     cat_cat=3)
 
 class_idx = 1
+
+# save the dataset for comparison reasons as csv
+example_df = pd.DataFrame(pd.concat([y, X], axis=1, ignore_index=True)).rename(
+    columns={0: 'y', 1: 'x1', 2: 'x2', 3: 'x3', 4: 'x4'})
+example_df.to_csv('orf/R/example_df.csv', index=False)

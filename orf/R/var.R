@@ -335,7 +335,7 @@ get_orf_variance <- function(honest_pred, honest_weights, train_pred, train_weig
 orf_var_R <- pred_orf_variance(honest_pred, honest_weights, Y_ind_honest)
 
 # export the variances into a csv file
-write.csv(orf_var_R, file = 'orf_var_R.csv', row.names = FALSE)
+write.csv(orf_var_R, file = 'data/orf_var_R.csv', row.names = FALSE)
 
 # prepare in-sample inputs
 train_pred <- lapply(honest_pred, function(x) x[ind_tr])
@@ -348,5 +348,5 @@ Y_ind_honest <- lapply(Y_ind_honest, function(x) x[ind_est])
 orf_var_R_in <- get_orf_variance(honest_pred, honest_weights, train_pred, train_weights, Y_ind_honest)
 
 # export the variances into a csv file
-write.csv(orf_var_R_in, file = 'orf_var_R_in.csv', row.names = FALSE)
+write.csv(orf_var_R_in, file = 'data/orf_var_R_in.csv', row.names = FALSE)
 
