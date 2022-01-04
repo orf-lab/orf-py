@@ -15,6 +15,8 @@ from sklearn.model_selection import train_test_split
 from econml.grf import RegressionForest
 import orf.honest_fit as honest_fit
 from joblib import Parallel, delayed
+from multiprocessing import Pool
+from functools import partial
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import _num_samples
@@ -218,6 +220,7 @@ class OrderedForest:
         # check whether pred_method is defined correctly
         if (pred_method == 'cython'
                 or pred_method == 'loop'
+                or pred_method == 'loop_multi'
                 or pred_method == 'numpy'
                 or pred_method == 'numpy_loop'
                 or pred_method == 'numpy_sparse'
@@ -340,8 +343,8 @@ class OrderedForest:
                     max_features=self.max_features,
                     max_samples=self.sample_fraction,
                     random_state=self.random_state,
-                    honest=False, # default is True!
-                    inference=False, # default is True!
+                    honest=False,  # default is True!
+                    inference=False,  # default is True!
                     subforest_size=1)
                 # fit the model with the binary outcome
                 forests[class_idx].fit(X=X_tr, y=outcome_ind)
@@ -439,7 +442,7 @@ class OrderedForest:
 #                         n_tr = len(ind_tr)
 #                         forest_out_train = np.zeros((n_tr, n_est))
 #                         forest_out_honest = np.zeros((n_est, n_est))
-# 
+#
 #                         # Loop over trees (via loops)
 #                         for tree in range(self.n_estimators):
 #                             # extract vectors of leaf IDs
@@ -474,7 +477,7 @@ class OrderedForest:
 #                                         tree_out_train[i, :] / leaf_size)
 #                             # add tree weights to overall forest weights
 #                             forest_out_train += tree_out_train
-# 
+#
 #                             # honest sample
 #                             # generate storage matrices for weights
 #                             tree_out_honest = np.empty((n_est, n_est))
@@ -501,7 +504,7 @@ class OrderedForest:
 #                                         tree_out_honest[i, :] / leaf_size)
 #                             # add tree weights to overall forest weights
 #                             forest_out_honest += tree_out_honest
-# 
+#
 #                         # combine train and honest sample
 #                         forest_out = np.vstack((forest_out_honest,
 #                                                 forest_out_train))
@@ -541,13 +544,60 @@ class OrderedForest:
                                 n_jobs=self.n_jobs,
                                 prefer="threads")(
                                     delayed(self.honest_fit_func)(
+                                        tree=tree,
                                         forest_apply=forest_apply,
                                         outcome_ind_est=outcome_ind_est,
-                                        tree=tree,
                                         max_id=max_id) for tree in range(
                                             0, self.n_estimators))
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
+
+                        # Check whether to use multiprocessing or not
+                        if self.pred_method == 'loop_multi':
+                            # Loop over trees in parallel
+                            # if __name__ == '__main__':
+                            # setup the pool for multiprocessing
+                            # num_cores = multiprocessing.cpu_count()
+                            pool = Pool(self.n_jobs)
+# =============================================================================
+#                                 # set fixed arguments
+#                                 forest_apply = forest_apply
+#                                 outcome_ind_est = outcome_ind_est
+#                                 max_id = max_id
+#                                 # wrap into partial pool function
+#                                 pool_fun = partial(self.honest_fit_func,
+#                                                    forest_apply,
+#                                                    outcome_ind_est,
+#                                                    max_id)
+#                                 # define iterables
+#                                 forest_apply_rep = {}
+#                                 outcome_ind_est_rep = {}
+#                                 max_id_rep = {}
+# =============================================================================
+                            # prepare iterables (need to replicate fixed items)
+                            args_iter = []
+                            for tree in range(self.n_estimators):
+                                args_iter.append((tree, forest_apply,
+                                                  outcome_ind_est, max_id))
+# =============================================================================
+#                                     forest_apply_rep[tree] = forest_apply
+#                                     outcome_ind_est_rep[tree] = outcome_ind_est
+#                                     max_id_rep[tree] = max_id
+# 
+#                                 args_iter = zip(np.arange(self.n_estimators),
+#                                                 forest_apply_rep,
+#                                                 outcome_ind_est_rep,
+#                                                 max_id_rep)
+# =============================================================================
+                            # loop over trees in parallel
+                            leaf_means = pool.starmap(honest_fit_func_out,
+                                                      args_iter)
+                            pool.close()  # close parallel
+                            pool.join()  # join parallel
+
+                            # assign honest predictions (honest fitted values)
+                            fitted[class_idx] = np.vstack(leaf_means).T
+
                         # Check whether to use numpy implementation or not
                         if self.pred_method == 'numpy':
                             # https://stackoverflow.com/questions/36960320
@@ -1031,7 +1081,7 @@ class OrderedForest:
         # empty return
         return None
 
-    def honest_fit_func(self, forest_apply, outcome_ind_est, tree, max_id):
+    def honest_fit_func(self, tree, forest_apply, outcome_ind_est, max_id):
         """Compute the honest leaf means using loop."""
         # create an empty array to save the leaf means
         leaf_means = np.empty(max_id)
@@ -1309,3 +1359,20 @@ class OrderedForest:
         variance_final = variance_final[ind_all.argsort(), :]
         # retunr final variance
         return variance_final
+
+
+# define function outside of the class for speedup of multiprocessing
+def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
+    """Compute the honest leaf means using loop."""
+    # create an empty array to save the leaf means
+    leaf_means = np.empty(max_id)
+    # loop over leaf indices
+    for idx in range(0, max_id):
+        # get row numbers of obs with this leaf index
+        row_idx = np.where(forest_apply[:, tree] == idx)
+        # Compute mean of outcome of these obs
+        if row_idx[0].size == 0:
+            leaf_means[idx] = 0
+        else:
+            leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
+    return leaf_means
