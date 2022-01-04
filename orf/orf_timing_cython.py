@@ -10,8 +10,8 @@ from econml.grf import RegressionForest
 import timeit
 
 # path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
-# path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
-path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
+path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+# path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -71,7 +71,7 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
     return pd.DataFrame(X), pd.Series(Y)
 
 
-sample_sizes = [1000, 4000, 16000]
+sample_sizes = [1000, 4000]
 time_table = {}
 
 for n_sample in sample_sizes:
@@ -179,6 +179,12 @@ n      2 x econML      numpy       loop    loop par     cython  cython par
 1000     1.800045   2.252607    3.225075      0.093093   3.285477          5.546436           5.727344
 4000     2.160294   4.980013    4.265472      0.247057   7.995749         10.241013           8.059144
 16000    3.448132  43.169730    8.746617      0.833426  32.396961         38.083952          26.027622
+"""
+
+""" on Linux with 4 cores
+      2 x econML     numpy  numpy_loop  numpy_sparse       loop  loop_multi_1core  loop_multi_3cores
+1000    2.886892  4.300113    5.448399      0.902705   5.370135          5.576034           4.982846
+4000    3.077446  8.320374    7.560145      1.538809  12.261584         12.679480           9.128731
 """
 
 sample_sizes = [1000]
