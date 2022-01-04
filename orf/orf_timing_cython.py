@@ -98,42 +98,42 @@ for n_sample in sample_sizes:
                              sample_fraction=0.5, honesty=True,
                              n_jobs=1, pred_method='numpy_loop')
     test_2 = %timeit -o oforest2.fit(X=features, y=outcome)
-
+    
     # 3.)
-    oforest3 = OrderedForest(n_estimators=10, min_samples_leaf=5,
+    oforest3 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=1, pred_method='numpy_sparse')
+                             n_jobs=3, pred_method='numpy_loop_multi')
     test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
 
     # 4.)
     oforest4 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=1, pred_method='loop')
+                             n_jobs=1, pred_method='numpy_sparse')
     test_4 = %timeit -o oforest4.fit(X=features, y=outcome)
 
     # 5.)
     oforest5 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=1, pred_method='loop_multi')
+                             n_jobs=3, pred_method='loop')
     test_5 = %timeit -o oforest5.fit(X=features, y=outcome)
-    
+
     # 6.)
     oforest6 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=4, pred_method='loop_multi')
+                             n_jobs=3, pred_method='loop_multi')
     test_6 = %timeit -o oforest6.fit(X=features, y=outcome)
 
-    # 5.)
+    # 7.)
 # =============================================================================
-#     oforest5 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+#     oforest7 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
 #                              max_features=0.5, replace=False,
 #                              sample_fraction=0.5, honesty=True,
 #                              n_jobs=4, pred_method='cython')
-#     test_5 = %timeit -o oforest5.fit(X=features, y=outcome)
+#     test_7 = %timeit -o oforest7.fit(X=features, y=outcome)
 # =============================================================================
 
     time_table[n_sample] = [test_0.average*2, test_1.average, test_2.average,
@@ -141,8 +141,8 @@ for n_sample in sample_sizes:
                             test_6.average]
 
 pd.DataFrame(time_table, index=['2 x econML', 'numpy', 'numpy_loop',
-                                'numpy_sparse', 'loop', 'loop_multi_1core',
-                                'loop_multi_3cores']).T
+                                'numpy_loop_multi', 'numpy_sparse', 'loop',
+                                'loop_multi']).T
 
 
 """
@@ -182,9 +182,9 @@ n      2 x econML      numpy       loop    loop par     cython  cython par
 """
 
 """ on Linux with 4 cores
-      2 x econML     numpy  numpy_loop  numpy_sparse       loop  loop_multi_1core  loop_multi_3cores
-1000    2.886892  4.300113    5.448399      0.902705   5.370135          5.576034           4.982846
-4000    3.077446  8.320374    7.560145      1.538809  12.261584         12.679480           9.128731
+      2 x econML     numpy  numpy_loop  numpy_loop_multi  numpy_sparse       loop  loop_multi
+1000    2.578914  3.942329    5.790034          4.898176      4.580967   6.429342    5.172048
+4000    3.118779  8.704739    7.855401          7.815587      8.511379  27.203318   11.680522
 """
 
 sample_sizes = [1000]

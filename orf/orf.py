@@ -223,6 +223,7 @@ class OrderedForest:
                 or pred_method == 'loop_multi'
                 or pred_method == 'numpy'
                 or pred_method == 'numpy_loop'
+                or pred_method == 'numpy_loop_multi'
                 or pred_method == 'numpy_sparse'
                 or pred_method == 'numpy_sparse2'):
             # assign the input value
@@ -644,18 +645,37 @@ class OrderedForest:
                                 leaf_means_vec, (-1, max_id)).T
                             # assign the honest predictions, i.e. fitted values
                             fitted[class_idx] = leaf_means
+
                         if self.pred_method == 'numpy_loop':
                             # Loop over trees
                             leaf_means = Parallel(n_jobs=self.n_jobs,
                                                   prefer="threads")(
                                 delayed(self.honest_fit_numpy_func)(
+                                    tree=tree,
                                     forest_apply=forest_apply,
                                     outcome_ind_est=outcome_ind_est,
-                                    tree=tree,
                                     max_id=max_id) for tree in range(
                                         0, self.n_estimators))
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
+                        
+                        # Check whether to use multiprocessing or not
+                        if self.pred_method == 'numpy_loop_multi':
+                            # setup the pool for multiprocessing
+                            pool = Pool(self.n_jobs)
+                            # prepare iterables (need to replicate fixed items)
+                            args_iter = []
+                            for tree in range(self.n_estimators):
+                                args_iter.append((tree, forest_apply,
+                                                  outcome_ind_est, max_id))
+                            # loop over trees in parallel
+                            leaf_means = pool.starmap(
+                                honest_fit_numpy_func_out, args_iter)
+                            pool.close()  # close parallel
+                            pool.join()  # join parallel
+                            # assign honest predictions (honest fitted values)
+                            fitted[class_idx] = np.vstack(leaf_means).T
+                        
                         # Compute predictions for whole sample: both tr and est
                         # Get leaf IDs for the whole set of observations
                         forest_apply = forests[class_idx].apply(X)
@@ -1067,7 +1087,7 @@ class OrderedForest:
                 leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
         return leaf_means
 
-    def honest_fit_numpy_func(self, forest_apply, outcome_ind_est, tree,
+    def honest_fit_numpy_func(self, tree, forest_apply, outcome_ind_est,
                               max_id):
         """Compute the honest leaf means using numpy."""
         # create an empty array to save the leaf means
@@ -1347,3 +1367,19 @@ def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
         else:
             leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
     return leaf_means
+
+
+def honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
+        """Compute the honest leaf means using numpy."""
+        # create an empty array to save the leaf means
+        leaf_means = np.zeros(max_id)
+        # Create dummy matrix dim(n_est, max_id)
+        onehot = OneHotEncoder(sparse=True).fit_transform(
+            forest_apply[:, tree].reshape(-1, 1))
+        # Compute leaf sums for each leaf
+        leaf_sums = onehot.T.dot(outcome_ind_est)
+        # Determine number of observations per leaf
+        leaf_n = onehot.sum(axis=0)
+        # Compute leaf means for each leaf
+        leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+        return leaf_means
