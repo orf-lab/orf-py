@@ -554,47 +554,18 @@ class OrderedForest:
 
                         # Check whether to use multiprocessing or not
                         if self.pred_method == 'loop_multi':
-                            # Loop over trees in parallel
-                            # if __name__ == '__main__':
                             # setup the pool for multiprocessing
-                            # num_cores = multiprocessing.cpu_count()
                             pool = Pool(self.n_jobs)
-# =============================================================================
-#                                 # set fixed arguments
-#                                 forest_apply = forest_apply
-#                                 outcome_ind_est = outcome_ind_est
-#                                 max_id = max_id
-#                                 # wrap into partial pool function
-#                                 pool_fun = partial(self.honest_fit_func,
-#                                                    forest_apply,
-#                                                    outcome_ind_est,
-#                                                    max_id)
-#                                 # define iterables
-#                                 forest_apply_rep = {}
-#                                 outcome_ind_est_rep = {}
-#                                 max_id_rep = {}
-# =============================================================================
                             # prepare iterables (need to replicate fixed items)
                             args_iter = []
                             for tree in range(self.n_estimators):
                                 args_iter.append((tree, forest_apply,
                                                   outcome_ind_est, max_id))
-# =============================================================================
-#                                     forest_apply_rep[tree] = forest_apply
-#                                     outcome_ind_est_rep[tree] = outcome_ind_est
-#                                     max_id_rep[tree] = max_id
-# 
-#                                 args_iter = zip(np.arange(self.n_estimators),
-#                                                 forest_apply_rep,
-#                                                 outcome_ind_est_rep,
-#                                                 max_id_rep)
-# =============================================================================
                             # loop over trees in parallel
                             leaf_means = pool.starmap(honest_fit_func_out,
                                                       args_iter)
                             pool.close()  # close parallel
                             pool.join()  # join parallel
-
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
 

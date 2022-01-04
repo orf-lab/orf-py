@@ -10,7 +10,8 @@ from econml.grf import RegressionForest
 import timeit
 
 # path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
-path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+# path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -70,7 +71,7 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
     return pd.DataFrame(X), pd.Series(Y)
 
 
-sample_sizes = [1000]
+sample_sizes = [1000, 4000, 16000]
 time_table = {}
 
 for n_sample in sample_sizes:
@@ -88,28 +89,28 @@ for n_sample in sample_sizes:
     oforest1 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='numpy')
+                             n_jobs=1, pred_method='numpy')
     test_1 = %timeit -o oforest1.fit(X=features, y=outcome)
 
     # 2.)
     oforest2 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='numpy_loop')
+                             n_jobs=1, pred_method='numpy_loop')
     test_2 = %timeit -o oforest2.fit(X=features, y=outcome)
 
     # 3.)
     oforest3 = OrderedForest(n_estimators=10, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='numpy_sparse')
+                             n_jobs=1, pred_method='numpy_sparse')
     test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
 
     # 4.)
     oforest4 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='loop')
+                             n_jobs=1, pred_method='loop')
     test_4 = %timeit -o oforest4.fit(X=features, y=outcome)
 
     # 5.)
@@ -123,7 +124,7 @@ for n_sample in sample_sizes:
     oforest6 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='loop_multi')
+                             n_jobs=4, pred_method='loop_multi')
     test_6 = %timeit -o oforest6.fit(X=features, y=outcome)
 
     # 5.)
@@ -164,6 +165,20 @@ n      2 x econML      numpy       loop    loop par     cython  cython par
 1000    1.503623    3.305515      2.658488      2.7687940
 20000   7.128304   19.515624     21.770787      20.517271
 100000 58.246735  110.120471    135.083053     128.428011
+"""
+
+""" on Mac with 11 cores
+       2 x econML      numpy  numpy_loop  numpy_sparse       loop  loop_multi_1core  loop_multi_3cores
+1000     1.677145   2.168326    3.348213      0.092924   3.295068          5.455551           9.259089
+4000     2.273600   4.948216    4.471807      0.249727  16.611614         10.421250          11.758524
+16000    3.514005  43.179584    7.439444      0.855642  65.371401         39.043368          47.348264
+"""
+
+""" on Mac with 4 cores
+       2 x econML      numpy  numpy_loop  numpy_sparse       loop  loop_multi_1core  loop_multi_3cores
+1000     1.800045   2.252607    3.225075      0.093093   3.285477          5.546436           5.727344
+4000     2.160294   4.980013    4.265472      0.247057   7.995749         10.241013           8.059144
+16000    3.448132  43.169730    8.746617      0.833426  32.396961         38.083952          26.027622
 """
 
 sample_sizes = [1000]
