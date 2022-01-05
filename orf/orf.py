@@ -380,63 +380,79 @@ class OrderedForest:
                                                             :]
                         # generate storage matrix for weights
                         forest_out = np.zeros((n_samples, n_est))
-# =============================================================================
-#                         # Loop over trees
-#                         for tree in range(self.n_estimators):
-#                             # extract vectors of leaf IDs
-#                             leaf_IDs_honest = forest_apply[:, tree]
-#                             leaf_IDs_all = forest_apply_all[:, tree]
-#                             # Generate onehot matrices
-#                             onehot_honest = OneHotEncoder(
-#                                 sparse=True).fit_transform(
-#                                     leaf_IDs_honest.reshape(-1, 1)).T
-#                             onehot_all = OneHotEncoder(
-#                                 sparse=True).fit_transform(
-#                                     leaf_IDs_all.reshape(-1, 1))
-#                             # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
-#                             tree_out = onehot_all.dot(onehot_honest).todense()
-#                             # Get leaf sizes
-#                             # leaf size only for honest sample !!!
-#                             leaf_size = tree_out.sum(axis=1)
-#                             # Compute weights
-#                             tree_out = tree_out/leaf_size
-#                             # add tree weights to overall forest weights
-#                             forest_out = forest_out + tree_out
-# =============================================================================
-
-                        # Loop over trees (via loops)
+                        
+                        # Loop over trees
                         for tree in range(self.n_estimators):
                             # extract vectors of leaf IDs
                             leaf_IDs_honest = forest_apply[:, tree]
                             leaf_IDs_all = forest_apply_all[:, tree]
-                            # Compute leaf sizes in honest sample
-                            unique, counts = np.unique(
-                                leaf_IDs_honest, return_counts=True)
-                            # generate storage matrices for weights
-                            tree_out = np.empty((n_samples, n_est))
-                            # Loop over sample of evaluation
-                            for i in range(n_samples):
-                                # Loop over honest sample
-                                for j in range(n_est):
-                                    # If leaf indices coincide...
-                                    if (leaf_IDs_all[i] ==
-                                            leaf_IDs_honest[j]):
-                                        # ... assign 1 to weight matrix
-                                        tree_out[i, j] = 1
-                                    # else assign 0
-                                    else:
-                                        tree_out[i, j] = 0
-                                # Compute number of observations in this
-                                # leaf in the honest sample
-                                # leaf_size = np.sum(tree_out[i, :])
-                                leaf_size = counts[np.where(
-                                    unique == leaf_IDs_all[i])]
-                                # If leaf size > 0 divide by leaf size
-                                if leaf_size > 0:
-                                    tree_out[i, :] = (
-                                        tree_out[i, :] / leaf_size)
+                            # Take care of cases where not all training leafs
+                            # populated by observations from honest sample
+                            leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+                            leaf_IDs_all_u = np.unique(leaf_IDs_all)
+                            if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+                                leaf_IDs_honest_ext = leaf_IDs_honest
+                            else:
+                                extra = np.setxor1d(leaf_IDs_all_u,
+                                                    leaf_IDs_honest_u)
+                                leaf_IDs_honest_ext = np.append(
+                                    leaf_IDs_honest, extra)
+                            # Generate onehot matrices
+                            onehot_honest = OneHotEncoder(
+                                sparse=True).fit_transform(
+                                    leaf_IDs_honest_ext.reshape(-1, 1)).T
+                            onehot_all = OneHotEncoder(
+                                sparse=True).fit_transform(
+                                    leaf_IDs_all.reshape(-1, 1))
+                            # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+                            tree_out = onehot_all.dot(onehot_honest).todense()
+                            # Get leaf sizes
+                            # leaf size only for honest sample !!!
+                            leaf_size = tree_out.sum(axis=1)
+                            # Delete extra observations for unpopulated honest
+                            # leaves
+                            if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+                                tree_out = tree_out[:n_samples,:n_est]
+                            # Compute weights
+                            tree_out = tree_out/leaf_size
                             # add tree weights to overall forest weights
-                            forest_out += tree_out
+                            forest_out = forest_out + tree_out
+
+# =============================================================================
+#                         # Loop over trees (via loops)
+#                         for tree in range(self.n_estimators):
+#                             # extract vectors of leaf IDs
+#                             leaf_IDs_honest = forest_apply[:, tree]
+#                             leaf_IDs_all = forest_apply_all[:, tree]
+#                             # Compute leaf sizes in honest sample
+#                             unique, counts = np.unique(
+#                                 leaf_IDs_honest, return_counts=True)
+#                             # generate storage matrices for weights
+#                             tree_out = np.empty((n_samples, n_est))
+#                             # Loop over sample of evaluation
+#                             for i in range(n_samples):
+#                                 # Loop over honest sample
+#                                 for j in range(n_est):
+#                                     # If leaf indices coincide...
+#                                     if (leaf_IDs_all[i] ==
+#                                             leaf_IDs_honest[j]):
+#                                         # ... assign 1 to weight matrix
+#                                         tree_out[i, j] = 1
+#                                     # else assign 0
+#                                     else:
+#                                         tree_out[i, j] = 0
+#                                 # Compute number of observations in this
+#                                 # leaf in the honest sample
+#                                 # leaf_size = np.sum(tree_out[i, :])
+#                                 leaf_size = counts[np.where(
+#                                     unique == leaf_IDs_all[i])]
+#                                 # If leaf size > 0 divide by leaf size
+#                                 if leaf_size > 0:
+#                                     tree_out[i, :] = (
+#                                         tree_out[i, :] / leaf_size)
+#                             # add tree weights to overall forest weights
+#                             forest_out += tree_out
+# =============================================================================
 
 # =============================================================================
 #                         # generate storage matrix for weights
