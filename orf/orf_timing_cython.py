@@ -71,7 +71,7 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
     return pd.DataFrame(X), pd.Series(Y)
 
 
-sample_sizes = [1000, 4000]
+sample_sizes = [4000]
 time_table = {}
 
 for n_sample in sample_sizes:
@@ -103,7 +103,7 @@ for n_sample in sample_sizes:
     oforest3 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='numpy_loop_multi')
+                             n_jobs=4, pred_method='numpy_loop_mpire')
     test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
 
     # 4.)
@@ -117,14 +117,14 @@ for n_sample in sample_sizes:
     oforest5 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='loop')
+                             n_jobs=1, pred_method='loop')
     test_5 = %timeit -o oforest5.fit(X=features, y=outcome)
 
     # 6.)
     oforest6 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
                              max_features=0.5, replace=False,
                              sample_fraction=0.5, honesty=True,
-                             n_jobs=3, pred_method='loop_multi')
+                             n_jobs=4, pred_method='loop_multi')
     test_6 = %timeit -o oforest6.fit(X=features, y=outcome)
 
     # 7.)
@@ -141,7 +141,7 @@ for n_sample in sample_sizes:
                             test_6.average]
 
 pd.DataFrame(time_table, index=['2 x econML', 'numpy', 'numpy_loop',
-                                'numpy_loop_multi', 'numpy_sparse', 'loop',
+                                'numpy_loop_mpire', 'numpy_sparse', 'loop',
                                 'loop_multi']).T
 
 
@@ -269,3 +269,42 @@ test_3 = %timeit -o oforest3.fit(X=features, y=outcome)
 1000    7.3019249857       1.57399261428
 10000
 """
+
+# test weights with and without mpire or multiprocessing
+sample_sizes = [500]
+time_table = {}
+
+for n_sample in sample_sizes:
+    # Generate data set
+    features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+
+    oforest_loop = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=True, random_state=123)
+    test_loop = %timeit -o oforest_loop.fit(X=features, y=outcome)
+    
+    
+    oforest_mpire = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=4, pred_method='numpy_loop',
+                                 weight_method='numpy_loop_mpire',
+                                 inference=True, random_state=123)
+    test_mpire = %timeit -o oforest_mpire.fit(X=features, y=outcome)
+    
+    oforest_multi = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=4, pred_method='numpy_loop',
+                                 weight_method='numpy_loop_multi',
+                                 inference=True, random_state=123)
+    test_multi = %timeit -o oforest_multi.fit(X=features, y=outcome)
+
+    time_table[n_sample] = [test_loop.average, test_mpire.average, test_multi.average]
+
+pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire', 'numpy_loop_multi']).T

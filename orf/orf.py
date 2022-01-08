@@ -10,12 +10,14 @@ Definitions of class and functions.
 # import modules
 import numpy as np
 import pandas as pd
+import _thread
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from econml.grf import RegressionForest
 import orf.honest_fit as honest_fit
 from joblib import Parallel, delayed
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
+from mpire import WorkerPool
 from functools import partial
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state
@@ -56,13 +58,17 @@ class OrderedForest:
         default is False.
     n_jobs : TYPE: int or None
         DESCRIPTION: The number of parallel jobs to be used for parallelism;
-        follows joblib semantics. n_jobs=-1 means all available cpu cores.
+        follows joblib semantics. n_jobs=-1 means all - 1 available cpu cores.
         n_jobs=None means no parallelism. There is no parallelism implemented
         for pred_method='numpy'. The default is -1.
     pred_method : TYPE str, one of 'cython', 'loop', 'numpy', 'numpy_loop'
         or 'numpy_sparse'.
         DESCRIPTION: Which method to use to compute honest predictions. The
         default is 'cython'.
+    weight_method : TYPE str, one of 'numpy_loop', 'numpy_loop_mpire', or
+        numpy_loop_multi'.
+        DESCRIPTION: Which method to use to compute honest weights. The
+        default is 'numpy_loop'.
     random_state : TYPE: int, None or numpy.random.RandomState object
         DESCRIPTION: Random seed used to initialize the pseudo-random number
         generator. The default is None. See numpy documentation for details.
@@ -84,6 +90,7 @@ class OrderedForest:
                  inference=False,
                  n_jobs=-1,
                  pred_method='cython',
+                 weight_method='numpy_loop',
                  random_state=None):
 
         # check and define the input parameters
@@ -210,8 +217,20 @@ class OrderedForest:
 
         # check whether n_jobs is integer
         if isinstance(n_jobs, int):
-            # assign the input value
-            self.n_jobs = n_jobs
+            # check max available cores
+            max_jobs = cpu_count()
+            # check if it is -1
+            if (n_jobs == -1):
+                # set max - 1 as default
+                self.n_jobs = max_jobs - 1
+            # check if jobs are admissible for the machine
+            elif (n_jobs >= 1 and n_jobs <= max_jobs):
+                # assign the input value
+                self.n_jobs = n_jobs
+            else:
+                # throw an error
+                raise ValueError("n_jobs must be greater than 0 and less than"
+                                 "available cores, got %s" % n_jobs)
         else:
             # raise value error
             raise ValueError("n_jobs must be of type integer"
@@ -224,6 +243,7 @@ class OrderedForest:
                 or pred_method == 'numpy'
                 or pred_method == 'numpy_loop'
                 or pred_method == 'numpy_loop_multi'
+                or pred_method == 'numpy_loop_mpire'
                 or pred_method == 'numpy_sparse'
                 or pred_method == 'numpy_sparse2'):
             # assign the input value
@@ -232,6 +252,19 @@ class OrderedForest:
             # raise value error
             raise ValueError("pred_method must be of cython, loop or numpy"
                              ", got %s" % pred_method)
+
+        # check whether weight_method is defined correctly
+        if (weight_method == 'numpy_loop'
+                or weight_method == 'numpy_loop_mpire'
+                or weight_method == 'numpy_loop_multi'):
+            # assign the input value
+            self.weight_method = weight_method
+        else:
+            # raise value error
+            raise ValueError("weight_method must be of numpy_loop, "
+                             "numpy_loop_mpire or numpy_loop_multi"
+                             ", got %s" % weight_method)
+
         # check whether seed is set (using scikitlearn check_random_state)
         self.random_state = check_random_state(random_state)
         # get max np.int32 based on machine limit
@@ -379,44 +412,107 @@ class OrderedForest:
                         forest_apply_all = forest_apply_all[ind_all.argsort(),
                                                             :]
                         # generate storage matrix for weights
-                        forest_out = np.zeros((n_samples, n_est))
-                        
-                        # Loop over trees
-                        for tree in range(self.n_estimators):
-                            # extract vectors of leaf IDs
-                            leaf_IDs_honest = forest_apply[:, tree]
-                            leaf_IDs_all = forest_apply_all[:, tree]
-                            # Take care of cases where not all training leafs
-                            # populated by observations from honest sample
-                            leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-                            leaf_IDs_all_u = np.unique(leaf_IDs_all)
-                            if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
-                                leaf_IDs_honest_ext = leaf_IDs_honest
-                            else:
-                                extra = np.setxor1d(leaf_IDs_all_u,
-                                                    leaf_IDs_honest_u)
-                                leaf_IDs_honest_ext = np.append(
-                                    leaf_IDs_honest, extra)
-                            # Generate onehot matrices
-                            onehot_honest = OneHotEncoder(
-                                sparse=True).fit_transform(
-                                    leaf_IDs_honest_ext.reshape(-1, 1)).T
-                            onehot_all = OneHotEncoder(
-                                sparse=True).fit_transform(
-                                    leaf_IDs_all.reshape(-1, 1))
-                            # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
-                            tree_out = onehot_all.dot(onehot_honest).todense()
-                            # Get leaf sizes
-                            # leaf size only for honest sample !!!
-                            leaf_size = tree_out.sum(axis=1)
-                            # Delete extra observations for unpopulated honest
-                            # leaves
-                            if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
-                                tree_out = tree_out[:n_samples,:n_est]
-                            # Compute weights
-                            tree_out = tree_out/leaf_size
-                            # add tree weights to overall forest weights
-                            forest_out = forest_out + tree_out
+                        # forest_out = np.zeros((n_samples, n_est))
+
+                        # check if parallelization should be used
+                        if self.weight_method == 'numpy_loop_mpire':
+                            # define partial function by fixing parameters
+                            partial_fun = partial(
+                                self.honest_weight_numpy,
+                                forest_apply=forest_apply,
+                                forest_apply_all=forest_apply_all,
+                                n_samples=n_samples,
+                                n_est=n_est)
+
+                            # set up the worker pool for parallelization
+                            pool = WorkerPool(n_jobs=self.n_jobs)
+                            # make sure to have enough memory for the outputs
+                            trees_out = np.zeros((self.n_estimators,
+                                                  n_samples, n_est))
+                            forest_out = np.zeros((n_samples, n_est))
+                            # loop over trees in parallel
+                            trees_out = np.array(pool.map(
+                                partial_fun, range(self.n_estimators),
+                                progress_bar=False,
+                                concatenate_numpy_output=False))
+                            # sum the forest
+                            forest_out = trees_out.sum(0)
+                            # free up the memory
+                            del trees_out
+                            # stop and join pool
+                            pool.stop_and_join()
+
+                        # check if parallelization should be used
+                        if self.weight_method == 'numpy_loop_multi':
+                            # use the multirpocessing module defined below
+                            forest_out = weight_sum(
+                                num_iters=self.n_estimators,
+                                n_jobs=self.n_jobs,
+                                forest_apply=forest_apply,
+                                forest_apply_all=forest_apply_all,
+                                n_samples=n_samples,
+                                n_est=n_est)
+
+# =============================================================================
+#                         # setup the pool for multiprocessing
+#                         pool = Pool(self.n_jobs)
+#                         # prepare iterables (need to replicate fixed items)
+#                         args_iter = []
+#                         for tree in range(self.n_estimators):
+#                             args_iter.append((tree, forest_apply,
+#                                               forest_apply_all, n_samples,
+#                                               n_est))
+#                         # loop over trees in parallel
+#                         # tree out saves all n_estimators weight matrices
+#                         # this is quite memory inefficient!!!
+#                         tree_out = pool.starmap(honest_weight_numpy_out,
+#                                                 args_iter)
+#                         pool.close()  # close parallel
+#                         pool.join()  # join parallel
+#                         # sum up all tree weights
+#                         forest_out = sum(tree_out)
+# =============================================================================
+
+                        if self.weight_method == 'numpy_loop':
+                            # generate storage matrix for weights
+                            forest_out = np.zeros((n_samples, n_est))
+                            # Loop over trees
+                            for tree in range(self.n_estimators):
+                                # extract vectors of leaf IDs
+                                leaf_IDs_honest = forest_apply[:, tree]
+                                leaf_IDs_all = forest_apply_all[:, tree]
+                                # Take care of cases where not all train leafs
+                                # populated by observations from honest sample
+                                leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+                                leaf_IDs_all_u = np.unique(leaf_IDs_all)
+                                if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+                                    leaf_IDs_honest_ext = leaf_IDs_honest
+                                else:
+                                    extra = np.setxor1d(leaf_IDs_all_u,
+                                                        leaf_IDs_honest_u)
+                                    leaf_IDs_honest_ext = np.append(
+                                        leaf_IDs_honest, extra)
+                                # Generate onehot matrices
+                                onehot_honest = OneHotEncoder(
+                                    sparse=True).fit_transform(
+                                        leaf_IDs_honest_ext.reshape(-1, 1)).T
+                                onehot_all = OneHotEncoder(
+                                    sparse=True).fit_transform(
+                                        leaf_IDs_all.reshape(-1, 1))
+                                # Multiply matrices
+                                # (n, n_leafs)x(n_leafs, n_est)
+                                tree_out = onehot_all.dot(onehot_honest).todense()
+                                # Get leaf sizes
+                                # leaf size only for honest sample !!!
+                                leaf_size = tree_out.sum(axis=1)
+                                # Delete extra observations for unpopulated
+                                # honest leaves
+                                if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+                                    tree_out = tree_out[:n_samples, :n_est]
+                                # Compute weights
+                                tree_out = tree_out/leaf_size
+                                # add tree weights to overall forest weights
+                                forest_out = forest_out + tree_out
 
 # =============================================================================
 #                         # Loop over trees (via loops)
@@ -554,12 +650,13 @@ class OrderedForest:
                                             0, self.n_estimators))
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
+
                         # Check whether to use loop implementation or not
                         if self.pred_method == 'loop':
                             # Loop over trees
                             leaf_means = Parallel(
                                 n_jobs=self.n_jobs,
-                                prefer="threads")(
+                                backend="loky")(
                                     delayed(self.honest_fit_func)(
                                         tree=tree,
                                         forest_apply=forest_apply,
@@ -615,6 +712,7 @@ class OrderedForest:
                             leaf_means = np.nan_to_num(leaf_means)
                             # assign the honest predictions, i.e. fitted values
                             fitted[class_idx] = leaf_means
+
                         if self.pred_method == 'numpy_sparse':
                             # Create 3Darray of dim(n_est, n_trees, max_id)
                             onehot = OneHotEncoder(sparse=True).fit(
@@ -639,6 +737,7 @@ class OrderedForest:
                                 leaf_means_vec)
                             # assign the honest predictions, i.e. fitted values
                             fitted[class_idx] = leaf_means
+
                         if self.pred_method == 'numpy_sparse2':
                             # Create 3D array of dim(n_est, n_trees, max_id)
                             onehot = OneHotEncoder(
@@ -665,7 +764,7 @@ class OrderedForest:
                         if self.pred_method == 'numpy_loop':
                             # Loop over trees
                             leaf_means = Parallel(n_jobs=self.n_jobs,
-                                                  prefer="threads")(
+                                                  backend="loky")(
                                 delayed(self.honest_fit_numpy_func)(
                                     tree=tree,
                                     forest_apply=forest_apply,
@@ -674,7 +773,7 @@ class OrderedForest:
                                         0, self.n_estimators))
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
-                        
+
                         # Check whether to use multiprocessing or not
                         if self.pred_method == 'numpy_loop_multi':
                             # setup the pool for multiprocessing
@@ -691,7 +790,30 @@ class OrderedForest:
                             pool.join()  # join parallel
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
-                        
+
+                        if self.pred_method == 'numpy_loop_mpire':
+                            # define partial function by fixing parameters
+                            partial_fun = partial(
+                                self.honest_fit_numpy_func,
+                                forest_apply=forest_apply,
+                                outcome_ind_est=outcome_ind_est,
+                                max_id=max_id)
+                            # set up the worker pool for parallelization
+                            pool = WorkerPool(n_jobs=self.n_jobs)
+                            # setup the pool for multiprocessing
+                            # pool = Pool(self.n_jobs)
+                            # loop over trees in parallel
+                            leaf_means = pool.map(
+                                partial_fun, range(self.n_estimators),
+                                progress_bar=False,
+                                concatenate_numpy_output=False)
+                            # stop and join pool
+                            pool.stop_and_join()
+                            # pool.close()  # close parallel
+                            # pool.join()  # join parallel
+                            # assign honest predictions (honest fitted values)
+                            fitted[class_idx] = np.vstack(leaf_means).T
+
                         # Compute predictions for whole sample: both tr and est
                         # Get leaf IDs for the whole set of observations
                         forest_apply = forests[class_idx].apply(X)
@@ -1119,6 +1241,88 @@ class OrderedForest:
         leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
         return leaf_means
 
+    def honest_weight_numpy(self, tree, forest_apply, forest_apply_all,
+                            n_samples, n_est):
+        """Compute the honest weights using numpy."""
+        # extract vectors of leaf IDs
+        leaf_IDs_honest = forest_apply[:, tree]
+        leaf_IDs_all = forest_apply_all[:, tree]
+        # Take care of cases where not all training leafs
+        # populated by observations from honest sample
+        leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+        leaf_IDs_all_u = np.unique(leaf_IDs_all)
+        if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+            leaf_IDs_honest_ext = leaf_IDs_honest
+        else:
+            extra = np.setxor1d(leaf_IDs_all_u,
+                                leaf_IDs_honest_u)
+            leaf_IDs_honest_ext = np.append(
+                leaf_IDs_honest, extra)
+        # Generate onehot matrices
+        onehot_honest = OneHotEncoder(
+            sparse=True).fit_transform(
+                leaf_IDs_honest_ext.reshape(-1, 1)).T
+        onehot_all = OneHotEncoder(
+            sparse=True).fit_transform(
+                leaf_IDs_all.reshape(-1, 1))
+        # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+        tree_out = onehot_all.dot(onehot_honest).todense()
+        # Get leaf sizes
+        # leaf size only for honest sample !!!
+        leaf_size = tree_out.sum(axis=1)
+        # Delete extra observations for unpopulated honest
+        # leaves
+        if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+            tree_out = tree_out[:n_samples, :n_est]
+        # Compute weights
+        tree_out = tree_out/leaf_size
+        return tree_out
+
+# =============================================================================
+#     def honest_weight_numpy(self, n_tree, forest_out, forest_apply, forest_apply_all,
+#                             n_samples, n_est):
+#         """Compute the honest weights using numpy."""
+#         # generate storage matrix for weights
+#         forest_out = np.zeros((n_samples, n_est))
+#         # Loop over trees
+#         for tree in range(n_tree):
+#             # extract vectors of leaf IDs
+#             leaf_IDs_honest = forest_apply[:, tree]
+#             leaf_IDs_all = forest_apply_all[:, tree]
+#             # Take care of cases where not all training leafs
+#             # populated by observations from honest sample
+#             leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+#             leaf_IDs_all_u = np.unique(leaf_IDs_all)
+#             if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+#                 leaf_IDs_honest_ext = leaf_IDs_honest
+#             else:
+#                 extra = np.setxor1d(leaf_IDs_all_u,
+#                                     leaf_IDs_honest_u)
+#                 leaf_IDs_honest_ext = np.append(
+#                     leaf_IDs_honest, extra)
+#             # Generate onehot matrices
+#             onehot_honest = OneHotEncoder(
+#                 sparse=True).fit_transform(
+#                     leaf_IDs_honest_ext.reshape(-1, 1)).T
+#             onehot_all = OneHotEncoder(
+#                 sparse=True).fit_transform(
+#                     leaf_IDs_all.reshape(-1, 1))
+#             # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+#             tree_out = onehot_all.dot(onehot_honest).todense()
+#             # Get leaf sizes
+#             # leaf size only for honest sample !!!
+#             leaf_size = tree_out.sum(axis=1)
+#             # Delete extra observations for unpopulated honest
+#             # leaves
+#             if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+#                 tree_out = tree_out[:n_samples, :n_est]
+#             # Compute weights
+#             tree_out = tree_out/leaf_size
+#             # add tree weights to overall forest weights
+#             forest_out = forest_out + tree_out
+#             return forest_out
+# =============================================================================
+
     # Function to compute variance of predictions.
     # -> Does the N in the formula refer to n_samples or to n_est?
     def honest_variance(self, probs, weights, outcome_binary, nclass, n_est):
@@ -1386,16 +1590,92 @@ def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
 
 
 def honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
-        """Compute the honest leaf means using numpy."""
-        # create an empty array to save the leaf means
-        leaf_means = np.zeros(max_id)
-        # Create dummy matrix dim(n_est, max_id)
-        onehot = OneHotEncoder(sparse=True).fit_transform(
-            forest_apply[:, tree].reshape(-1, 1))
-        # Compute leaf sums for each leaf
-        leaf_sums = onehot.T.dot(outcome_ind_est)
-        # Determine number of observations per leaf
-        leaf_n = onehot.sum(axis=0)
-        # Compute leaf means for each leaf
-        leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
-        return leaf_means
+    """Compute the honest leaf means using numpy."""
+    # create an empty array to save the leaf means
+    leaf_means = np.zeros(max_id)
+    # Create dummy matrix dim(n_est, max_id)
+    onehot = OneHotEncoder(sparse=True).fit_transform(
+        forest_apply[:, tree].reshape(-1, 1))
+    # Compute leaf sums for each leaf
+    leaf_sums = onehot.T.dot(outcome_ind_est)
+    # Determine number of observations per leaf
+    leaf_n = onehot.sum(axis=0)
+    # Compute leaf means for each leaf
+    leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+    return leaf_means
+
+
+def honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
+                            n_est):
+    """Compute the honest weights using numpy."""
+    # extract vectors of leaf IDs
+    leaf_IDs_honest = forest_apply[:, tree]
+    leaf_IDs_all = forest_apply_all[:, tree]
+    # Take care of cases where not all training leafs
+    # populated by observations from honest sample
+    leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+    leaf_IDs_all_u = np.unique(leaf_IDs_all)
+    if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+        leaf_IDs_honest_ext = leaf_IDs_honest
+    else:
+        extra = np.setxor1d(leaf_IDs_all_u,
+                            leaf_IDs_honest_u)
+        leaf_IDs_honest_ext = np.append(
+            leaf_IDs_honest, extra)
+    # Generate onehot matrices
+    onehot_honest = OneHotEncoder(
+        sparse=True).fit_transform(
+            leaf_IDs_honest_ext.reshape(-1, 1)).T
+    onehot_all = OneHotEncoder(
+        sparse=True).fit_transform(
+            leaf_IDs_all.reshape(-1, 1))
+    # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+    tree_out = onehot_all.dot(onehot_honest).todense()
+    # Get leaf sizes
+    # leaf size only for honest sample !!!
+    leaf_size = tree_out.sum(axis=1)
+    # Delete extra observations for unpopulated honest
+    # leaves
+    if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+        tree_out = tree_out[:n_samples, :n_est]
+    # Compute weights
+    tree_out = tree_out/leaf_size
+    return tree_out
+
+
+# define class for the callback option in multirpocessing
+# taken from: https://stackoverflow.com/questions/9068478/how-to-parallelize-a-sum-calculation-in-python-numpy
+class WightSum:
+    def __init__(self, n_samples, n_est):
+        self.value = np.zeros((n_samples, n_est))
+        self.lock = _thread.allocate_lock()
+        self.count = 0
+
+    def add(self, value):
+        self.count += 1
+        self.lock.acquire()
+        self.lock.release()
+
+
+def weight_sum(num_iters, n_jobs, forest_apply, forest_apply_all, n_samples,
+               n_est):
+
+    # define partial function by fixing parameters
+    partial_fun = partial(honest_weight_numpy_out,
+                          forest_apply=forest_apply,
+                          forest_apply_all=forest_apply_all,
+                          n_samples=n_samples,
+                          n_est=n_est)
+    # start multiprocessing pool
+    pool = Pool(processes=n_jobs)
+    # initialize class
+    WeightArr = WightSum(n_samples=n_samples, n_est=n_est)
+    # loop with a callback
+    for index in range(num_iters):
+        singlepoolresult = pool.apply_async(partial_fun, (index, ),
+                                            callback=WeightArr.add)
+    # close the pool
+    pool.close()
+    pool.join()
+    # get results
+    return WeightArr.value
