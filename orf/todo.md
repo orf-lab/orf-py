@@ -6,7 +6,6 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 - implement honesty and inference for the predict function
 - implement honesty and inference for the margins function
-- improve multiprocessing for weights computation
 
 ## Done:
 
@@ -21,6 +20,9 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 - bug fix for numpy based weights computation
 - implementation of multiprocessing for weights computation
 - set n_jobs for max -1 as default
+- improve multiprocessing for weights computation
+- checked correctness of multiprocessing output across different weight_methods
+- set defaults for pred_method and weightmethod using mpire module for multiprocessing
 
 ## Comments:
 

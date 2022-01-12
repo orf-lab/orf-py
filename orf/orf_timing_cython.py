@@ -287,8 +287,8 @@ for n_sample in sample_sizes:
                                  weight_method='numpy_loop',
                                  inference=True, random_state=123)
     test_loop = %timeit -o oforest_loop.fit(X=features, y=outcome)
-    
-    
+
+
     oforest_mpire = OrderedForest(n_estimators=500, min_samples_leaf=5,
                                  max_features=0.5, replace=False,
                                  sample_fraction=0.5, honesty=True,
@@ -296,15 +296,27 @@ for n_sample in sample_sizes:
                                  weight_method='numpy_loop_mpire',
                                  inference=True, random_state=123)
     test_mpire = %timeit -o oforest_mpire.fit(X=features, y=outcome)
-    
-    oforest_multi = OrderedForest(n_estimators=500, min_samples_leaf=5,
+
+
+    oforest_shared_multi = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                max_features=0.5, replace=False,
+                                sample_fraction=0.5, honesty=True,
+                                n_jobs=4, pred_method='numpy_loop',
+                                weight_method='numpy_loop_shared_multi',
+                                inference=True, random_state=123)
+    test_shared_multi = %timeit -o oforest_shared_multi.fit(X=features, y=outcome)
+
+
+    oforest_shared_mpire = OrderedForest(n_estimators=500, min_samples_leaf=5,
                                  max_features=0.5, replace=False,
                                  sample_fraction=0.5, honesty=True,
                                  n_jobs=4, pred_method='numpy_loop',
-                                 weight_method='numpy_loop_multi',
+                                 weight_method='numpy_loop_shared_mpire',
                                  inference=True, random_state=123)
-    test_multi = %timeit -o oforest_multi.fit(X=features, y=outcome)
+    test_shared_mpire = %timeit -o oforest_shared_mpire.fit(X=features, y=outcome)
 
-    time_table[n_sample] = [test_loop.average, test_mpire.average, test_multi.average]
+    time_table[n_sample] = [test_loop.average, test_mpire.average,
+                            test_shared_multi.average, test_shared_mpire.average]
 
-pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire', 'numpy_loop_multi']).T
+pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire',
+                                'numpy_loop_shared_multi', 'numpy_loop_shared_mpire']).T

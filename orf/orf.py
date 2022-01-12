@@ -11,12 +11,13 @@ Definitions of class and functions.
 import numpy as np
 import pandas as pd
 import _thread
+import sharedmem
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from econml.grf import RegressionForest
 import orf.honest_fit as honest_fit
 from joblib import Parallel, delayed
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, cpu_count, Lock
 from mpire import WorkerPool
 from functools import partial
 from sklearn.preprocessing import OneHotEncoder
@@ -62,13 +63,13 @@ class OrderedForest:
         n_jobs=None means no parallelism. There is no parallelism implemented
         for pred_method='numpy'. The default is -1.
     pred_method : TYPE str, one of 'cython', 'loop', 'numpy', 'numpy_loop'
-        or 'numpy_sparse'.
+        'numpy_loop_multi', 'numpy_loop_mpire' or 'numpy_sparse'.
         DESCRIPTION: Which method to use to compute honest predictions. The
-        default is 'cython'.
-    weight_method : TYPE str, one of 'numpy_loop', 'numpy_loop_mpire', or
-        numpy_loop_multi'.
+        default is 'numpy_loop_mpire'.
+    weight_method : TYPE str, one of 'numpy_loop', 'numpy_loop_mpire',
+        numpy_loop_multi', numpy_loop_shared_multi or numpy_loop_shared_mpire.
         DESCRIPTION: Which method to use to compute honest weights. The
-        default is 'numpy_loop'.
+        default is 'numpy_loop_shared_mpire'.
     random_state : TYPE: int, None or numpy.random.RandomState object
         DESCRIPTION: Random seed used to initialize the pseudo-random number
         generator. The default is None. See numpy documentation for details.
@@ -89,8 +90,8 @@ class OrderedForest:
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='cython',
-                 weight_method='numpy_loop',
+                 pred_method='numpy_loop_mpire',
+                 weight_method='numpy_loop_shared_mpire',
                  random_state=None):
 
         # check and define the input parameters
@@ -256,13 +257,16 @@ class OrderedForest:
         # check whether weight_method is defined correctly
         if (weight_method == 'numpy_loop'
                 or weight_method == 'numpy_loop_mpire'
+                or weight_method == 'numpy_loop_shared_mpire'
+                or weight_method == 'numpy_loop_shared_multi'
                 or weight_method == 'numpy_loop_multi'):
             # assign the input value
             self.weight_method = weight_method
         else:
             # raise value error
             raise ValueError("weight_method must be of numpy_loop, "
-                             "numpy_loop_mpire or numpy_loop_multi"
+                             "numpy_loop_mpire, numpy_loop_shared_mpire, "
+                             "numpy_loop_shared_multi or numpy_loop_multi"
                              ", got %s" % weight_method)
 
         # check whether seed is set (using scikitlearn check_random_state)
@@ -442,36 +446,59 @@ class OrderedForest:
                             # stop and join pool
                             pool.stop_and_join()
 
-                        # check if parallelization should be used
-                        if self.weight_method == 'numpy_loop_multi':
-                            # use the multirpocessing module defined below
-                            forest_out = weight_sum(
-                                num_iters=self.n_estimators,
-                                n_jobs=self.n_jobs,
+                        # use shared memory to add matrices using multiprocess
+                        if self.weight_method == 'numpy_loop_shared_multi':
+                            # define partial function by fixing parameters
+                            partial_fun = partial(
+                                tree_weights,
                                 forest_apply=forest_apply,
                                 forest_apply_all=forest_apply_all,
                                 n_samples=n_samples,
                                 n_est=n_est)
+                            # compute the forest weights in parallel
+                            forest_out = np.array(forest_weights_multi(
+                                partial_fun=partial_fun,
+                                n_samples=n_samples,
+                                n_est=n_est,
+                                n_jobs=self.n_jobs,
+                                n_estimators=self.n_estimators))
 
-# =============================================================================
-#                         # setup the pool for multiprocessing
-#                         pool = Pool(self.n_jobs)
-#                         # prepare iterables (need to replicate fixed items)
-#                         args_iter = []
-#                         for tree in range(self.n_estimators):
-#                             args_iter.append((tree, forest_apply,
-#                                               forest_apply_all, n_samples,
-#                                               n_est))
-#                         # loop over trees in parallel
-#                         # tree out saves all n_estimators weight matrices
-#                         # this is quite memory inefficient!!!
-#                         tree_out = pool.starmap(honest_weight_numpy_out,
-#                                                 args_iter)
-#                         pool.close()  # close parallel
-#                         pool.join()  # join parallel
-#                         # sum up all tree weights
-#                         forest_out = sum(tree_out)
-# =============================================================================
+                        # use shared memory to add matrices using mpire (fast)
+                        if self.weight_method == 'numpy_loop_shared_mpire':
+                            # define partial function by fixing parameters
+                            partial_fun = partial(
+                                tree_weights,
+                                forest_apply=forest_apply,
+                                forest_apply_all=forest_apply_all,
+                                n_samples=n_samples,
+                                n_est=n_est)
+                            # compute the forest weights in parallel
+                            forest_out = np.array(forest_weights_mpire(
+                                partial_fun=partial_fun,
+                                n_samples=n_samples,
+                                n_est=n_est,
+                                n_jobs=self.n_jobs,
+                                n_estimators=self.n_estimators))
+
+                        # use pure multiprocessing 
+                        if self.weight_method == 'numpy_loop_multi':
+                            # setup the pool for multiprocessing
+                            pool = Pool(self.n_jobs)
+                            # prepare iterables (need to replicate fixed items)
+                            args_iter = []
+                            for tree in range(self.n_estimators):
+                                args_iter.append((tree, forest_apply,
+                                                  forest_apply_all, n_samples,
+                                                  n_est))
+                            # loop over trees in parallel
+                            # tree out saves all n_estimators weight matrices
+                            # this is quite memory inefficient!!!
+                            tree_out = pool.starmap(honest_weight_numpy_out,
+                                                    args_iter)
+                            pool.close()  # close parallel
+                            pool.join()  # join parallel
+                            # sum up all tree weights
+                            forest_out = sum(tree_out)
 
                         if self.weight_method == 'numpy_loop':
                             # generate storage matrix for weights
@@ -1643,39 +1670,37 @@ def honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
     return tree_out
 
 
-# define class for the callback option in multirpocessing
-# taken from: https://stackoverflow.com/questions/9068478/how-to-parallelize-a-sum-calculation-in-python-numpy
-class WightSum:
-    def __init__(self, n_samples, n_est):
-        self.value = np.zeros((n_samples, n_est))
-        self.lock = _thread.allocate_lock()
-        self.count = 0
-
-    def add(self, value):
-        self.count += 1
-        self.lock.acquire()
-        self.lock.release()
+# multiprocessing with shared memory
+_lock = Lock()  # initiate lock
 
 
-def weight_sum(num_iters, n_jobs, forest_apply, forest_apply_all, n_samples,
-               n_est):
+# define tree weight function in shared memory
+def tree_weights(_shared_buffer, tree, forest_apply, forest_apply_all,
+                 n_samples, n_est):
+    # get the tree weights
+    tree_out = honest_weight_numpy_out(tree, forest_apply, forest_apply_all,
+                                       n_samples, n_est)
+    _lock.acquire()
+    _shared_buffer += tree_out  # update the buffer with tree weights
+    _lock.release()
 
-    # define partial function by fixing parameters
-    partial_fun = partial(honest_weight_numpy_out,
-                          forest_apply=forest_apply,
-                          forest_apply_all=forest_apply_all,
-                          n_samples=n_samples,
-                          n_est=n_est)
-    # start multiprocessing pool
-    pool = Pool(processes=n_jobs)
-    # initialize class
-    WeightArr = WightSum(n_samples=n_samples, n_est=n_est)
-    # loop with a callback
-    for index in range(num_iters):
-        singlepoolresult = pool.apply_async(partial_fun, (index, ),
-                                            callback=WeightArr.add)
-    # close the pool
-    pool.close()
-    pool.join()
-    # get results
-    return WeightArr.value
+
+# define forest weights function in shared memory using multiprocessing
+def forest_weights_multi(partial_fun, n_samples, n_est, n_jobs, n_estimators):
+    # initiate output in shared memory
+    forest_out = sharedmem.empty((n_samples, n_est), dtype=np.float64)
+    pool = Pool(n_jobs)  # start the multiprocessing pool
+    pool.starmap(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
+    pool.close()  # close parallel
+    pool.join()  # join parallel
+    return forest_out
+
+
+# # define forest weights function in shared memory using mpire (faster)
+def forest_weights_mpire(partial_fun, n_samples, n_est, n_jobs, n_estimators):
+    # initiate output in shared memory
+    forest_out = sharedmem.empty((n_samples, n_est), dtype=np.float64)
+    pool = WorkerPool(n_jobs)  # start the mpire pool
+    pool.map(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
+    pool.stop_and_join()  # stop and join pool
+    return forest_out
