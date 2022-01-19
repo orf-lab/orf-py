@@ -7,6 +7,8 @@ Definitions of class and functions.
 
 """
 
+# %% Packages
+
 # import modules
 import numpy as np
 import pandas as pd
@@ -21,10 +23,11 @@ from multiprocessing import Pool, cpu_count, Lock
 from mpire import WorkerPool
 from functools import partial
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.utils import check_random_state
-from sklearn.utils.validation import _num_samples
+from sklearn.utils import check_random_state, check_X_y, check_array
+from sklearn.utils.validation import _num_samples, _num_features, check_is_fitted
 # from numba import jit, njit, types, vectorize
 
+# %% Class definition
 
 # define OrderedForest class
 class OrderedForest:
@@ -282,7 +285,8 @@ class OrderedForest:
         # initialize performance metrics
         self.confusion = None
         self.measures = None
-
+    
+    # %% Fit function
     # function to estimate ordered forest
     def fit(self, X, y, verbose=False):
         """
@@ -290,40 +294,60 @@ class OrderedForest:
 
         Parameters
         ----------
-        X : TYPE: pd.DataFrame
+        X : TYPE: array-like
             DESCRIPTION: matrix of covariates.
-        y : TYPE: pd.Series
+        y : TYPE: array-like
             DESCRIPTION: vector of outcomes.
         verbose : TYPE: bool
-            DESCRIPTION: should be the results printed to console?
+            DESCRIPTION: should the results be printed to console?
             Default is False.
 
         Returns
         -------
         result: ordered probability predictions by Ordered Forest.
         """
-        # check if features X are a pandas dataframe
-        self.__xcheck(X)
-
-        # check if outcome y is a pandas series
-        if isinstance(y, pd.Series):
-            # check if its non-empty
-            if y.empty:
-                # raise value error
-                raise ValueError("y Series is empty. Check the input.")
+        # Use sklearn input checks to allow for multiple types of inputs:
+        # - returns numpy arrays for X and y (no matter which input type)
+        # - forces y to be numeric
+        X,y = check_X_y(X,y, y_numeric=True, estimator="OrderedForest")
+        # Get vector of sorted unique values of y
+        y_values = np.unique(y)
+        # Get the number of outcome classes
+        self.n_class = nclass = len(y_values)
+        # Next, ensure that y is a vector of contiguous integers starting at 
+        # 1 up to nclass
+        # Check if y consists of integers
+        if not all(isinstance(x, (np.integer)) for x in y_values):
+            # Recode y appropriately (keeps order but recodes values as 1,2...)
+            y = np.searchsorted(np.unique(y), y)+1
         else:
-            # raise value error
-            raise ValueError("y is not a Pandas Series. Recode the input.")
+            # Check if contiguous sequence
+            if not ((min(y_values)==1) and (max(y_values)==nclass)):
+                # Recode y appropriately
+                y = np.searchsorted(np.unique(y), y)+1
 
-        # get the number of outcome classes
-        nclass = len(y.unique())
+# =============================================================================
+#         # check if features X are a pandas dataframe
+#         self.__xcheck(X)
+# 
+#         # check if outcome y is a pandas series
+#         if isinstance(y, pd.Series):
+#             # check if its non-empty
+#             if y.empty:
+#                 # raise value error
+#                 raise ValueError("y Series is empty. Check the input.")
+#         else:
+#             # raise value error
+#             raise ValueError("y is not a Pandas Series. Recode the input.")
+# =============================================================================
+
         # obtain total number of observations
         n_samples = _num_samples(X)
-        # define the labels if not supplied using list comprehension
-        labels = ['Class ' + str(c_idx) for c_idx in range(1, nclass + 1)]
+        # obtain total number of observations
+        self.n_features = _num_features(X)
         # create an empty dictionary to save the forests
         forests = {}
-        # create an empty dictionary to save the predictions
+        # create an empty array to save the predictions
         probs = np.empty((n_samples, nclass-1))
         # create an empty dictionary to save the fitted values
         fitted = {}
@@ -351,6 +375,9 @@ class OrderedForest:
         else:
             X_tr = X
             y_tr = y
+            X_est = None
+            ind_tr = np.arange(n_samples)
+            ind_est = None
         # estimate random forest on each class outcome except the last one
         for class_idx in range(1, nclass, 1):
             # create binary outcome indicator for the outcome in the forest
@@ -369,10 +396,7 @@ class OrderedForest:
                 # fit the model with the binary outcome
                 forests[class_idx].fit(X=X_tr, y=outcome_ind)
                 # get in-sample predictions, i.e. the out-of-bag predictions
-                probs[class_idx] = pd.Series(
-                    forests[class_idx].oob_prediction_,
-                    name=labels[class_idx - 1],
-                    index=X_tr.index)
+                probs[:,class_idx-1] = forests[class_idx].oob_prediction_
             else:
                 # call rf from econML and save it in dictionary
                 forests[class_idx] = RegressionForest(
@@ -389,10 +413,8 @@ class OrderedForest:
                 # if no honesty, get the oob predictions
                 if not self.honesty:
                     # get in-sample predictions, i.e. out-of-bag predictions
-                    probs[class_idx] = pd.Series(
-                        forests[class_idx].oob_predict(X_tr).squeeze(),
-                        name=labels[class_idx - 1],
-                        index=X_tr.index)
+                    probs[:,class_idx-1] = forests[class_idx].oob_predict(
+                        X_tr).squeeze()
                 else:
                     # Get leaf IDs for estimation set
                     forest_apply = forests[class_idx].apply(X_est)
@@ -862,8 +884,12 @@ class OrderedForest:
         class_probs[class_probs < 0] = 0
         # normalize predictions to sum up to 1 after non-negativity correction
         class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
-        # set the new column names according to specified class labels
-        class_probs = pd.DataFrame(class_probs, columns=labels)
+        
+        # Don't transform to pandas df!!! Uncomment next two rows to use "old"
+        # predict function
+        # labels = ['Class ' + str(c_idx) for c_idx in range(1, nclass + 1)]
+        # class_probs = pd.DataFrame(class_probs, columns=labels)
+        
         # Compute variance of predicitons if inference = True
         # outcome need to come from the honest sample here, outcome_binary_est
         if self.inference:
@@ -902,98 +928,255 @@ class OrderedForest:
         # pack estimated forest and class predictions into output dictionary
         self.forest = {'forests': forests, 'probs': class_probs,
                        'fitted': fitted, 'outcome_binary': outcome_binary,
-                       'weights': weights, 'variance': variance}
+                       'variance': variance, 'X_fit': X, 'ind_tr': ind_tr,
+                       'ind_est': ind_est, 'weights': weights}
         # compute prediction performance
-        self.__performance(y)
+        self.__performance(y, y_values)
         # check if performance metrics should be printed
         if verbose:
             self.performance()
 
         # return the output
         return self
-
+    
+    # %% Predict function
     # function to predict with estimated ordered forest
-    def predict(self, X, prob=True):
+    def predict(self, X=None, prob=True):
         """
         Ordered Forest prediction.
 
         Parameters
         ----------
-        X : TYPE: pd.DataFrame
-            DESCRIPTION: matrix of covariates.
+        X : TYPE: array-like or NoneType
+            DESCRIPTION: Matrix of new covariates or None if covariates from
+            fit function should be used. If new data provided it must have
+            the same number of features as the X in the fit function.
         prob : TYPE: bool
-            DESCRIPTION: should the ordered probabilities be predicted?
+            DESCRIPTION: Should the ordered probabilities be predicted?
             If False, ordered classes will be predicted instead.
             Default is True.
 
         Returns
         -------
-        result: ordered probability predictions by Ordered Forest.
+        result: Tuple of ordered probability predictions by Ordered Forest
+        and respective variances.
         """
-        # check if features X are a pandas dataframe
-        self.__xcheck(X)
-
-        # get the estimated forests
+        # Input checks
+        # check if input has been fitted (sklearn function)
+        check_is_fitted(self, attributes=["forest"])
+        
+        # Check if X defined properly (sklearn function)
+        if not X is None:
+            X = check_array(X)
+            # Check if number of variables matches with input in fit
+            if not X.shape[1]==self.n_features:
+                raise ValueError("Number of features (covariates) should be "
+                                 "%s but got %s. Provide \narray with the same"
+                                 " number of features as the X in the fit "
+                                 "function." % (self.n_features,X.shape[1]))
+            # get the number of observations in X
+            n_samples = _num_samples(X)
+            # Check if provided X exactly matches X used in fit function
+            if np.array_equal(X, self.forest['X_fit']):
+                X = None
+        else:
+            n_samples = _num_samples(self.forest['X_fit'])
+        
+        # check whether to predict probabilities or classes
+        if isinstance(prob, bool):
+            # assign the input value
+            self.prob = prob
+        else:
+            # raise value error
+            raise ValueError("prob must be of type boolean"
+                             ", got %s" % prob)
+        
+        # get the forest inputs
         forests = self.forest['forests']
-        # get the class labels
-        labels = list(self.forest['probs'].columns)
+        fitted = self.forest['fitted']
+        outcome_binary = self.forest['outcome_binary']
+        probs = self.forest['probs']
+        variance = self.forest['variance']
+        ind_est = self.forest['ind_est']
         # get the number of outcome classes
-        nclass = len(labels)
+        nclass = self.n_class
         # get the number of trees
         ntrees = self.n_estimators
-        # get the number of observations in X
-        nobs = X.shape[0]
-        # create an empty dictionary to save the predictions
-        probs = {}
+        # get inference argument
+        inference = self.inference
+        
+        # Check if prob allows to do inference
+        if ((not prob) and (inference)):
+            print('-' * 60, 
+                  'WARNING: Inference is not possible if prob=False.' 
+                  '\nClass predictions might be obtained considerably faster '
+                  'when \nusing OrderedForest with option inference=False.', 
+                  '-' * 60, sep='\n')
 
-        # estimate random forest on each class outcome except the last one
-        for class_idx in range(1, nclass, 1):
-            # if no honesty used, predict the standard way
-            if not self.honesty:
-                # predict with the estimated forests out-of-sample
-                probs[class_idx] = pd.Series(
-                    forests[class_idx].predict(X=X).squeeze(),
-                    name=labels[class_idx - 1],
-                    index=X.index)
+        # Initialize final variance output
+        var_final = {}
+        # Initialize storage dictionary for weights
+        weights = {}
+        
+        # Get fitted values if X = None
+        if X is None:
+            # Check desired type of predictions
+            if prob:
+                # Take in-sample predictions and variance
+                pred_final = probs
+                var_final = variance
             else:
-                # Get leaf means
-                leaf_means = self.forest['fitted'][class_idx]
-                # Get leaf IDs for test set
-                forest_apply = forests[class_idx].apply(X)
-                # generate grid to read out indices column by column
-                grid = np.meshgrid(np.arange(0, ntrees), np.arange(0, nobs))[0]
-                # assign leaf means to indices
-                y_hat = leaf_means[forest_apply, grid]
-                # Average over trees
-                probs[class_idx] = pd.Series(np.mean(y_hat, axis=1),
-                                             name=labels[class_idx - 1],
-                                             index=X.index)
-        # collect predictions into a dataframe
-        probs = pd.DataFrame(probs)
-        # create 2 distinct matrices with zeros and ones for easy subtraction
-        probs_0 = pd.concat([pd.Series(np.zeros(probs.shape[0]),
-                                       index=probs.index,
-                                       name=0), probs], axis=1)
-        probs_1 = pd.concat([probs, pd.Series(np.ones(probs.shape[0]),
-                                              index=probs.index, name=nclass)],
-                            axis=1)
-        # difference out the adjacent categories to singleout the class probs
-        class_probs = probs_1 - probs_0.values
-        # check if some probabilities become negative and set them to zero
-        class_probs[class_probs < 0] = 0
-        # normalize predictions to sum up to 1 after non-negativity correction
-        class_probs = class_probs.divide(class_probs.sum(axis=1), axis=0)
-        # check if ordered classes instead of ordered probabilities are desired
-        if not prob:
-            # predict classes with highest probability (+1 as idx starts at 0)
-            class_probs = pd.Series((class_probs.values.argmax(axis=1) + 1),
-                                    index=X.index)
-        # set the new column names according to specified class labels
-        class_probs.columns = labels
+                # convert in-sample probabilities into class predictions 
+                # ("ordered classification")
+                pred_final = probs.argmax(axis=1) + 1
+        # Remaining case: X is not None
+        else:    
+            # create an empty array to save the predictions
+            probs = np.empty((n_samples, nclass-1))
+            # If honesty has not been used, used standard predict function
+            # from sklearn or econML
+            if not self.honesty:
+                # Loop over classes
+                for class_idx in range(1, nclass, 1):
+                    # get in-sample predictions, i.e. out-of-bag predictions
+                    probs[:,class_idx-1] = forests[class_idx].predict(
+                        X=X).squeeze()
+            # If honesty True, inference argument decides how to compute
+            # predicions
+            elif self.honesty and not inference:
+                # Run new Xs through estimated train forest and compute 
+                # predictions based on honest sample. No need to predict
+                # weights, get predictions directly through leaf means.
+                # Loop over classes
+                for class_idx in range(1, nclass, 1):
+                    # Get leaf IDs for new data set
+                    forest_apply = forests[class_idx].apply(X)
+                    # generate grid to read out indices column by column
+                    grid = np.meshgrid(np.arange(0, ntrees), 
+                                       np.arange(0, n_samples))[0]
+                    # assign leaf means to indices
+                    y_hat = fitted[class_idx][forest_apply, grid]
+                    # Average over trees
+                    probs[:, class_idx-1] = np.mean(y_hat, axis=1)
+            # Remaining case refers to honesty=True and inference=True
+            else:
+                # Step 1: Predict weights by using honest data from fit and
+                # newdata (for each category except one)
+                # First extract honest data from fit output
+                X_est = self.forest['X_fit'][ind_est,:]
+                # Loop over classes
+                for class_idx in range(1, nclass, 1):
+                    # Get leaf IDs for estimation set
+                    forest_apply = forests[class_idx].apply(X_est)
+                    # create binary outcome indicator for est sample
+                    outcome_ind_est = outcome_binary[class_idx]
+                    # Get size of estimation sample
+                    n_est = forest_apply.shape[0]
+                    # Get leaf IDs for newdata
+                    forest_apply_all = forests[class_idx].apply(X)
+# =============================================================================
+# In the end: insert here weight.method which works best. For now numpy_loop
+# =============================================================================
+                    # self.weight_method == 'numpy_loop':
+                    # generate storage matrix for weights
+                    forest_out = np.zeros((n_samples, n_est))
+                    # Loop over trees
+                    for tree in range(self.n_estimators):
+                        # extract vectors of leaf IDs
+                        leaf_IDs_honest = forest_apply[:, tree]
+                        leaf_IDs_all = forest_apply_all[:, tree]
+                        # Take care of cases where not all train leafs
+                        # populated by observations from honest sample
+                        leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+                        leaf_IDs_all_u = np.unique(leaf_IDs_all)
+                        if np.array_equal(leaf_IDs_honest_u, leaf_IDs_all_u):
+                            leaf_IDs_honest_ext = leaf_IDs_honest
+                            leaf_IDs_all_ext = leaf_IDs_all
+                        else:
+                            # Find leaf IDs in all that are not in honest
+                            extra_honest = np.setdiff1d(
+                                leaf_IDs_all_u, leaf_IDs_honest_u)
+                            leaf_IDs_honest_ext = np.append(
+                                leaf_IDs_honest, extra_honest)
+                            # Find leaf IDs in honest that are not in all
+                            extra_all = np.setdiff1d(
+                                leaf_IDs_honest_u, leaf_IDs_all_u)
+                            leaf_IDs_all_ext = np.append(
+                                leaf_IDs_all, extra_all)
+                        # Generate onehot matrices
+                        onehot_honest = OneHotEncoder(
+                            sparse=True).fit_transform(
+                                leaf_IDs_honest_ext.reshape(-1, 1)).T
+                        onehot_all = OneHotEncoder(
+                            sparse=True).fit_transform(
+                                leaf_IDs_all_ext.reshape(-1, 1))
+                        onehot_all = onehot_all[:n_samples,:]
+                        # Multiply matrices
+                        # (n, n_leafs)x(n_leafs, n_est)
+                        tree_out = onehot_all.dot(onehot_honest).todense()
+                        # Get leaf sizes
+                        # leaf size only for honest sample !!!
+                        leaf_size = tree_out.sum(axis=1)
+                        # Delete extra observations for unpopulated
+                        # honest leaves
+                        if not np.array_equal(
+                                leaf_IDs_honest_u, leaf_IDs_all_u):
+                            tree_out = tree_out[:n_samples, :n_est]
+                        # Compute weights
+                        tree_out = tree_out/leaf_size
+                        # add tree weights to overall forest weights
+                        forest_out = forest_out + tree_out
+                    # Divide by the number of trees to obtain final weights
+                    forest_out = forest_out / self.n_estimators
+                    # Compute predictions and assign to probs vector
+                    predictions = np.dot(forest_out, outcome_ind_est)
+                    probs[:, class_idx-1] = np.asarray(
+                            predictions.T).reshape(-1)
+                    # Save weights matrix
+                    weights[class_idx] = forest_out
+# =============================================================================
+# End of numpy_loop
+# =============================================================================
+            # create 2 distinct matrices with zeros and ones for easy subtraction
+            # prepend vector of zeros
+            probs_0 = np.hstack((np.zeros((n_samples, 1)), probs))
+            # postpend vector of ones
+            probs_1 = np.hstack((probs, np.ones((n_samples, 1))))
+            # difference out the adjacent categories to singleout the class probs
+            class_probs = probs_1 - probs_0
+            # check if some probabilities become negative and set them to zero
+            class_probs[class_probs < 0] = 0
+            # normalize predictions to sum up to 1 after non-negativity correction
+            class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
+            # Check desired type of predictions (applies only to cases where
+            # inference = false)
+            if prob:
+                # Take in-sample predictions and variance
+                pred_final = class_probs
+            else:
+                # convert in-sample probabilities into class predictions 
+                # ("ordered classification")
+                pred_final = class_probs.argmax(axis=1) + 1
+            
+            # Last step: Compute variance of predicitons 
+            # If flag_newdata = True, variance can be computed in one step.
+            # Otherwise use same variance method as in fit function which 
+            # accounts for splitting in training and honest sample
+            if inference and prob:
+                # compute variance
+                var_final = self.honest_variance(
+                    probs=probs, weights=weights,
+                    outcome_binary=outcome_binary, nclass=nclass,
+                    n_est=n_samples)
 
         # return the class predictions
-        return class_probs
+        if not var_final is {}:
+            result = (pred_final, var_final)
+        else:
+            result = pred_final
+        return result
 
+    # %% Margin function
     # function to evaluate marginal effects with estimated ordered forest
     def margin(self, X, window=0.1, verbose=False):
         """
@@ -1120,8 +1303,9 @@ class OrderedForest:
         # return marginal effects
         return margins
 
+    # %% Performance functions
     # performance measures (private method, not available to user)
-    def __performance(self, y):
+    def __performance(self, y, y_values):
         """
         Evaluate the prediction performance using MSE and CA.
 
@@ -1139,44 +1323,38 @@ class OrderedForest:
 
         # compute the mse: version 1
         # create storage empty dataframe
-        mse_matrix = pd.DataFrame(0, index=y.index,
-                                  columns=predictions.columns)
+        mse_matrix = np.zeros(predictions.shape)
         # allocate indicators for true outcome and leave zeros for the others
         # minus 1 for the column index as indices start with 0, outcomes with 1
-        for obs_idx in range(len(y)):
-            mse_matrix.iloc[obs_idx, y.iloc[obs_idx] - 1] = 1
+        mse_matrix[np.arange(y.shape[0]),y-1] = 1
         # compute mse directly now by substracting two dataframes and rowsums
         mse_1 = np.mean(((mse_matrix - predictions) ** 2).sum(axis=1))
 
         # compute the mse: version 2
         # create storage for modified predictions
-        modified_pred = pd.Series(0, index=y.index)
+        modified_pred = np.zeros(y.shape[0])
         # modify the predictions with 1*P(1)+2*P(2)+3*P(3) as an alternative
-        for class_idx in range(len(predictions.columns)):
-            # add modified predictions together for all class values
-            modified_pred = (modified_pred +
-                             (class_idx + 1) * predictions.iloc[:, class_idx])
-        # compute the mse directly now by substracting two series and mean
+        modified_pred = np.dot(predictions, np.arange(
+            start=1, stop=predictions.shape[1]+1))
+        # Compute MSE
         mse_2 = np.mean((y - modified_pred) ** 2)
 
         # compute classification accuracy
         # define classes with highest probability (+1 as index starts with 0)
-        class_pred = pd.Series((predictions.values.argmax(axis=1) + 1),
-                               index=y.index)
+        class_pred = predictions.argmax(axis=1) + 1
         # the accuracy directly now by mean of matching classes
         acc = np.mean(y == class_pred)
 
         # create te confusion matrix
-        self.confusion = pd.DataFrame(index=predictions.columns,
-                                      columns=predictions.columns)
-        # fill in the matrix by comparisons
-        # loop over the actual outcomes
-        for actual in range(len(self.confusion)):
-            # loop over the predicted outcomes
-            for predicted in range(len(self.confusion)):
-                # compare the actual with predicted and sum it up
-                self.confusion.iloc[actual, predicted] = sum(
-                    (y == actual + 1) & (class_pred == predicted + 1))
+        # First generate onehot matrices of y and class_pred        
+        y_onehot = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1, 1))
+        class_pred_onehot = OneHotEncoder(sparse=False).fit_transform(
+            class_pred.reshape(-1, 1))
+        # Compute dot product of these matrices to obtain confusion matrix
+        confusion_mat = np.dot(np.transpose(y_onehot), class_pred_onehot)
+        labels = ['Class ' + str(c_idx) for c_idx in y_values]
+        self.confusion = pd.DataFrame(confusion_mat, 
+                                      index=labels, columns=labels)
 
         # wrap the results into a dataframe
         self.measures = pd.DataFrame({'mse 1': mse_1, 'mse 2': mse_2,
@@ -1210,33 +1388,37 @@ class OrderedForest:
         # empty return
         return None
 
-    # check user input for covariates (private method, not available to user)
-    def __xcheck(self, X):
-        """
-        Check the user input for the pandas dataframe of covariates.
+# Not needed anymore, use sklearn check_X_y instead
+# =============================================================================
+#     # check user input for covariates (private method, not available to user)
+#     def __xcheck(self, X):
+#         """
+#         Check the user input for the pandas dataframe of covariates.
+# 
+#         Parameters
+#         ----------
+#         X : TYPE: pd.DataFrame
+#             DESCRIPTION: matrix of covariates.
+# 
+#         Returns
+#         -------
+#         None. Checks for the correct user input.
+#         """
+#         # check if features X are a pandas dataframe
+#         if isinstance(X, pd.DataFrame):
+#             # check if its non-empty
+#             if X.empty:
+#                 # raise value error
+#                 raise ValueError("X DataFrame is empty. Check the input.")
+#         else:
+#             # raise value error
+#             raise ValueError("X is not a Pandas DataFrame. Recode the input.")
+# 
+#         # empty return
+#         return None
+# =============================================================================
 
-        Parameters
-        ----------
-        X : TYPE: pd.DataFrame
-            DESCRIPTION: matrix of covariates.
-
-        Returns
-        -------
-        None. Checks for the correct user input.
-        """
-        # check if features X are a pandas dataframe
-        if isinstance(X, pd.DataFrame):
-            # check if its non-empty
-            if X.empty:
-                # raise value error
-                raise ValueError("X DataFrame is empty. Check the input.")
-        else:
-            # raise value error
-            raise ValueError("X is not a Pandas DataFrame. Recode the input.")
-
-        # empty return
-        return None
-
+    # %% In-class honesty and weight functions
     def honest_fit_func(self, tree, forest_apply, outcome_ind_est, max_id):
         """Compute the honest leaf means using loop."""
         # create an empty array to save the leaf means
@@ -1598,7 +1780,7 @@ class OrderedForest:
         # retunr final variance
         return variance_final
 
-
+# %% Out-of-class honesty and weight functions (for parallelization)
 # define function outside of the class for speedup of multiprocessing
 def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
     """Compute the honest leaf means using loop."""

@@ -10,8 +10,8 @@ Showcase application of the Ordered Forest estimator.
 import pandas as pd
 import os
 import numpy as np
-# path="D:\switchdrive\Projects\ORF_Python\ORFpy"
-path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+# path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -29,12 +29,12 @@ features = odata.drop('Y', axis=1)
 # Set seed
 np.random.seed(999)
 # initiate the class with tuning parameters
-oforest = OrderedForest(n_estimators=500, min_samples_leaf=5, max_features=0.3,
+oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3,
                         replace=False, sample_fraction=0.5, honesty=True,
-                        n_jobs=4, pred_method='numpy_loop',
+                        n_jobs=-1, pred_method='numpy_loop',
                         weight_method='numpy_loop', inference=True)
 # fit the model
-forest_fit = oforest.fit(X=features, y=outcome)
+forest_fit = oforest.fit(X=features, y=outcome, verbose=True)
 # predict ordered probabilities
 oforest.predict(X=features)
 # predict ordered classes

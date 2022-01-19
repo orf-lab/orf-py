@@ -7,8 +7,8 @@ import pandas as pd
 import os
 import numpy as np
 import timeit
-# path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
-path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+# path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -17,7 +17,8 @@ from orf.orf import OrderedForest
 # initiate the class with tuning parameters
 self = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3,
                         replace=False, sample_fraction=0.5, honesty=True,
-                        n_jobs=-1, pred_method='numpy_loop', inference=True)
+                        n_jobs=1, pred_method='numpy_loop', inference=True,
+                        weight_method='numpy_loop')
 
 # Define function to produce data sets of different size
 def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
@@ -74,7 +75,7 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
 
 
 # Generate data set
-X, y = example_data(seed=123, n=5000, p_cont=1, p_cat=1,
+X, y = example_data(seed=123, n=1000, p_cont=1, p_cat=1,
                     p_binary=1, noise=True, y_cat=3,
                     cat_cat=3)
 
