@@ -534,20 +534,29 @@ class OrderedForest:
                                 # populated by observations from honest sample
                                 leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
                                 leaf_IDs_all_u = np.unique(leaf_IDs_all)
-                                if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+                                if np.array_equal(leaf_IDs_honest_u, 
+                                                  leaf_IDs_all_u):
                                     leaf_IDs_honest_ext = leaf_IDs_honest
+                                    leaf_IDs_all_ext = leaf_IDs_all
                                 else:
-                                    extra = np.setxor1d(leaf_IDs_all_u,
-                                                        leaf_IDs_honest_u)
+                                    # Find leaf IDs in all that are not in honest
+                                    extra_honest = np.setdiff1d(
+                                        leaf_IDs_all_u, leaf_IDs_honest_u)
                                     leaf_IDs_honest_ext = np.append(
-                                        leaf_IDs_honest, extra)
+                                        leaf_IDs_honest, extra_honest)
+                                    # Find leaf IDs in honest that are not in all
+                                    extra_all = np.setdiff1d(
+                                        leaf_IDs_honest_u, leaf_IDs_all_u)
+                                    leaf_IDs_all_ext = np.append(
+                                        leaf_IDs_all, extra_all)
                                 # Generate onehot matrices
                                 onehot_honest = OneHotEncoder(
                                     sparse=True).fit_transform(
                                         leaf_IDs_honest_ext.reshape(-1, 1)).T
                                 onehot_all = OneHotEncoder(
                                     sparse=True).fit_transform(
-                                        leaf_IDs_all.reshape(-1, 1))
+                                        leaf_IDs_all_ext.reshape(-1, 1))
+                                onehot_all = onehot_all[:n_samples,:]
                                 # Multiply matrices
                                 # (n, n_leafs)x(n_leafs, n_est)
                                 tree_out = onehot_all.dot(onehot_honest).todense()
@@ -556,13 +565,15 @@ class OrderedForest:
                                 leaf_size = tree_out.sum(axis=1)
                                 # Delete extra observations for unpopulated
                                 # honest leaves
-                                if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+                                if not np.array_equal(
+                                        leaf_IDs_honest_u, leaf_IDs_all_u):
                                     tree_out = tree_out[:n_samples, :n_est]
                                 # Compute weights
                                 tree_out = tree_out/leaf_size
                                 # add tree weights to overall forest weights
                                 forest_out = forest_out + tree_out
-
+                                
+                        
 # =============================================================================
 #                         # Loop over trees (via loops)
 #                         for tree in range(self.n_estimators):
@@ -927,7 +938,7 @@ class OrderedForest:
             variance = {}
         # pack estimated forest and class predictions into output dictionary
         self.forest = {'forests': forests, 'probs': class_probs,
-                       'fitted': fitted, 'outcome_binary': outcome_binary,
+                       'fitted': fitted, 'outcome_binary_est': outcome_binary_est,
                        'variance': variance, 'X_fit': X, 'ind_tr': ind_tr,
                        'ind_est': ind_est, 'weights': weights}
         # compute prediction performance
@@ -994,7 +1005,7 @@ class OrderedForest:
         # get the forest inputs
         forests = self.forest['forests']
         fitted = self.forest['fitted']
-        outcome_binary = self.forest['outcome_binary']
+        outcome_binary_est = self.forest['outcome_binary_est']
         probs = self.forest['probs']
         variance = self.forest['variance']
         ind_est = self.forest['ind_est']
@@ -1069,7 +1080,7 @@ class OrderedForest:
                     # Get leaf IDs for estimation set
                     forest_apply = forests[class_idx].apply(X_est)
                     # create binary outcome indicator for est sample
-                    outcome_ind_est = outcome_binary[class_idx]
+                    outcome_ind_est = outcome_binary_est[class_idx]
                     # Get size of estimation sample
                     n_est = forest_apply.shape[0]
                     # Get leaf IDs for newdata
@@ -1082,48 +1093,10 @@ class OrderedForest:
                     forest_out = np.zeros((n_samples, n_est))
                     # Loop over trees
                     for tree in range(self.n_estimators):
-                        # extract vectors of leaf IDs
-                        leaf_IDs_honest = forest_apply[:, tree]
-                        leaf_IDs_all = forest_apply_all[:, tree]
-                        # Take care of cases where not all train leafs
-                        # populated by observations from honest sample
-                        leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-                        leaf_IDs_all_u = np.unique(leaf_IDs_all)
-                        if np.array_equal(leaf_IDs_honest_u, leaf_IDs_all_u):
-                            leaf_IDs_honest_ext = leaf_IDs_honest
-                            leaf_IDs_all_ext = leaf_IDs_all
-                        else:
-                            # Find leaf IDs in all that are not in honest
-                            extra_honest = np.setdiff1d(
-                                leaf_IDs_all_u, leaf_IDs_honest_u)
-                            leaf_IDs_honest_ext = np.append(
-                                leaf_IDs_honest, extra_honest)
-                            # Find leaf IDs in honest that are not in all
-                            extra_all = np.setdiff1d(
-                                leaf_IDs_honest_u, leaf_IDs_all_u)
-                            leaf_IDs_all_ext = np.append(
-                                leaf_IDs_all, extra_all)
-                        # Generate onehot matrices
-                        onehot_honest = OneHotEncoder(
-                            sparse=True).fit_transform(
-                                leaf_IDs_honest_ext.reshape(-1, 1)).T
-                        onehot_all = OneHotEncoder(
-                            sparse=True).fit_transform(
-                                leaf_IDs_all_ext.reshape(-1, 1))
-                        onehot_all = onehot_all[:n_samples,:]
-                        # Multiply matrices
-                        # (n, n_leafs)x(n_leafs, n_est)
-                        tree_out = onehot_all.dot(onehot_honest).todense()
-                        # Get leaf sizes
-                        # leaf size only for honest sample !!!
-                        leaf_size = tree_out.sum(axis=1)
-                        # Delete extra observations for unpopulated
-                        # honest leaves
-                        if not np.array_equal(
-                                leaf_IDs_honest_u, leaf_IDs_all_u):
-                            tree_out = tree_out[:n_samples, :n_est]
-                        # Compute weights
-                        tree_out = tree_out/leaf_size
+                        tree_out = self.honest_weight_numpy(
+                            tree=tree, forest_apply=forest_apply, 
+                            forest_apply_all=forest_apply_all,
+                            n_samples=n_samples, n_est=n_est)
                         # add tree weights to overall forest weights
                         forest_out = forest_out + tree_out
                     # Divide by the number of trees to obtain final weights
@@ -1166,8 +1139,8 @@ class OrderedForest:
                 # compute variance
                 var_final = self.honest_variance(
                     probs=probs, weights=weights,
-                    outcome_binary=outcome_binary, nclass=nclass,
-                    n_est=n_samples)
+                    outcome_binary=outcome_binary_est, nclass=nclass,
+                    n_est=n_est)
 
         # return the class predictions
         if not var_final is {}:
@@ -1456,36 +1429,54 @@ class OrderedForest:
         # extract vectors of leaf IDs
         leaf_IDs_honest = forest_apply[:, tree]
         leaf_IDs_all = forest_apply_all[:, tree]
-        # Take care of cases where not all training leafs
+        # Take care of cases where not all train leafs
         # populated by observations from honest sample
         leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
         leaf_IDs_all_u = np.unique(leaf_IDs_all)
-        if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+        if np.array_equal(leaf_IDs_honest_u, 
+                          leaf_IDs_all_u):
             leaf_IDs_honest_ext = leaf_IDs_honest
+            leaf_IDs_all_ext = leaf_IDs_all
         else:
-            extra = np.setxor1d(leaf_IDs_all_u,
-                                leaf_IDs_honest_u)
+            # Find leaf IDs in all that are not in honest
+            extra_honest = np.setdiff1d(
+                leaf_IDs_all_u, leaf_IDs_honest_u)
             leaf_IDs_honest_ext = np.append(
-                leaf_IDs_honest, extra)
+                leaf_IDs_honest, extra_honest)
+            # Find leaf IDs in honest that are not in all
+            extra_all = np.setdiff1d(
+                leaf_IDs_honest_u, leaf_IDs_all_u)
+            leaf_IDs_all_ext = np.append(
+                leaf_IDs_all, extra_all)
         # Generate onehot matrices
         onehot_honest = OneHotEncoder(
             sparse=True).fit_transform(
                 leaf_IDs_honest_ext.reshape(-1, 1)).T
         onehot_all = OneHotEncoder(
             sparse=True).fit_transform(
-                leaf_IDs_all.reshape(-1, 1))
-        # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+                leaf_IDs_all_ext.reshape(-1, 1))
+        onehot_all = onehot_all[:n_samples,:]
+        # Multiply matrices
+        # (n, n_leafs)x(n_leafs, n_est)
         tree_out = onehot_all.dot(onehot_honest).todense()
         # Get leaf sizes
         # leaf size only for honest sample !!!
         leaf_size = tree_out.sum(axis=1)
-        # Delete extra observations for unpopulated honest
-        # leaves
-        if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+        # Delete extra observations for unpopulated
+        # honest leaves
+        if not np.array_equal(
+                leaf_IDs_honest_u, leaf_IDs_all_u):
             tree_out = tree_out[:n_samples, :n_est]
         # Compute weights
         tree_out = tree_out/leaf_size
         return tree_out
+
+
+
+    
+
+
+
 
 # =============================================================================
 #     def honest_weight_numpy(self, n_tree, forest_out, forest_apply, forest_apply_all,
@@ -1599,7 +1590,7 @@ class OrderedForest:
         for class_idx in range(1, nclass, 1):
             honest_variance_first[class_idx+1] = honest_variance[class_idx]
         # Create storage container
-        honest_variance_final = np.empty((n_est, nclass))
+        honest_variance_final = np.empty((probs.shape[0], nclass))
         # Compute final variance according to: var_last + var_first - cov
         for class_idx in range(1, nclass+1, 1):
             honest_variance_final[
@@ -1820,32 +1811,43 @@ def honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
     # extract vectors of leaf IDs
     leaf_IDs_honest = forest_apply[:, tree]
     leaf_IDs_all = forest_apply_all[:, tree]
-    # Take care of cases where not all training leafs
+    # Take care of cases where not all train leafs
     # populated by observations from honest sample
     leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
     leaf_IDs_all_u = np.unique(leaf_IDs_all)
-    if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+    if np.array_equal(leaf_IDs_honest_u, 
+                      leaf_IDs_all_u):
         leaf_IDs_honest_ext = leaf_IDs_honest
+        leaf_IDs_all_ext = leaf_IDs_all
     else:
-        extra = np.setxor1d(leaf_IDs_all_u,
-                            leaf_IDs_honest_u)
+        # Find leaf IDs in all that are not in honest
+        extra_honest = np.setdiff1d(
+            leaf_IDs_all_u, leaf_IDs_honest_u)
         leaf_IDs_honest_ext = np.append(
-            leaf_IDs_honest, extra)
+            leaf_IDs_honest, extra_honest)
+        # Find leaf IDs in honest that are not in all
+        extra_all = np.setdiff1d(
+            leaf_IDs_honest_u, leaf_IDs_all_u)
+        leaf_IDs_all_ext = np.append(
+            leaf_IDs_all, extra_all)
     # Generate onehot matrices
     onehot_honest = OneHotEncoder(
         sparse=True).fit_transform(
             leaf_IDs_honest_ext.reshape(-1, 1)).T
     onehot_all = OneHotEncoder(
         sparse=True).fit_transform(
-            leaf_IDs_all.reshape(-1, 1))
-    # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+            leaf_IDs_all_ext.reshape(-1, 1))
+    onehot_all = onehot_all[:n_samples,:]
+    # Multiply matrices
+    # (n, n_leafs)x(n_leafs, n_est)
     tree_out = onehot_all.dot(onehot_honest).todense()
     # Get leaf sizes
     # leaf size only for honest sample !!!
     leaf_size = tree_out.sum(axis=1)
-    # Delete extra observations for unpopulated honest
-    # leaves
-    if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+    # Delete extra observations for unpopulated
+    # honest leaves
+    if not np.array_equal(
+            leaf_IDs_honest_u, leaf_IDs_all_u):
         tree_out = tree_out[:n_samples, :n_est]
     # Compute weights
     tree_out = tree_out/leaf_size

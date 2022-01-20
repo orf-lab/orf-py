@@ -43,8 +43,6 @@ for inf in boolbool:
             res[np.str0(('inf',inf,'prob',prob,'X',i))] = oforest.predict(
                 X=X, prob=prob)
 
-# PROBLEM: Predictions for last case are wrong! Should be the same as in other
-# cases with prob=True
 
 # =============================================================================
 # Test parallelization of fit via leaf means
