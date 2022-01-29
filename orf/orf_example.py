@@ -32,7 +32,7 @@ np.random.seed(999)
 oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3,
                         replace=False, sample_fraction=0.5, honesty=True,
                         n_jobs=-1, pred_method='numpy_loop',
-                        weight_method='numpy_loop', inference=True)
+                        weight_method='numpy_loop', inference=False)
 # fit the model
 forest_fit = oforest.fit(X=features, y=outcome, verbose=True)
 # predict ordered probabilities
@@ -42,4 +42,4 @@ oforest.predict(X=features, prob=False)
 # evaluate the prediction performance
 oforest.performance()
 # evaluate marginal effects
-oforest.margin(X=features)
+oforest.margin(X=features, eval_point="mean", verbose=True)

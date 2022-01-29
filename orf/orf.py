@@ -1003,16 +1003,11 @@ class OrderedForest:
                              ", got %s" % prob)
         
         # get the forest inputs
-        forests = self.forest['forests']
-        fitted = self.forest['fitted']
         outcome_binary_est = self.forest['outcome_binary_est']
         probs = self.forest['probs']
         variance = self.forest['variance']
-        ind_est = self.forest['ind_est']
         # get the number of outcome classes
         nclass = self.n_class
-        # get the number of trees
-        ntrees = self.n_estimators
         # get inference argument
         inference = self.inference
         
@@ -1042,74 +1037,18 @@ class OrderedForest:
                 pred_final = probs.argmax(axis=1) + 1
         # Remaining case: X is not None
         else:    
-            # create an empty array to save the predictions
-            probs = np.empty((n_samples, nclass-1))
             # If honesty has not been used, used standard predict function
             # from sklearn or econML
             if not self.honesty:
-                # Loop over classes
-                for class_idx in range(1, nclass, 1):
-                    # get in-sample predictions, i.e. out-of-bag predictions
-                    probs[:,class_idx-1] = forests[class_idx].predict(
-                        X=X).squeeze()
+                probs = self.predict_default(X=X, n_samples=n_samples)
             # If honesty True, inference argument decides how to compute
             # predicions
             elif self.honesty and not inference:
-                # Run new Xs through estimated train forest and compute 
-                # predictions based on honest sample. No need to predict
-                # weights, get predictions directly through leaf means.
-                # Loop over classes
-                for class_idx in range(1, nclass, 1):
-                    # Get leaf IDs for new data set
-                    forest_apply = forests[class_idx].apply(X)
-                    # generate grid to read out indices column by column
-                    grid = np.meshgrid(np.arange(0, ntrees), 
-                                       np.arange(0, n_samples))[0]
-                    # assign leaf means to indices
-                    y_hat = fitted[class_idx][forest_apply, grid]
-                    # Average over trees
-                    probs[:, class_idx-1] = np.mean(y_hat, axis=1)
+                probs = self.predict_leafmeans(X=X, n_samples=n_samples)
             # Remaining case refers to honesty=True and inference=True
             else:
-                # Step 1: Predict weights by using honest data from fit and
-                # newdata (for each category except one)
-                # First extract honest data from fit output
-                X_est = self.forest['X_fit'][ind_est,:]
-                # Loop over classes
-                for class_idx in range(1, nclass, 1):
-                    # Get leaf IDs for estimation set
-                    forest_apply = forests[class_idx].apply(X_est)
-                    # create binary outcome indicator for est sample
-                    outcome_ind_est = outcome_binary_est[class_idx]
-                    # Get size of estimation sample
-                    n_est = forest_apply.shape[0]
-                    # Get leaf IDs for newdata
-                    forest_apply_all = forests[class_idx].apply(X)
-# =============================================================================
-# In the end: insert here weight.method which works best. For now numpy_loop
-# =============================================================================
-                    # self.weight_method == 'numpy_loop':
-                    # generate storage matrix for weights
-                    forest_out = np.zeros((n_samples, n_est))
-                    # Loop over trees
-                    for tree in range(self.n_estimators):
-                        tree_out = self.honest_weight_numpy(
-                            tree=tree, forest_apply=forest_apply, 
-                            forest_apply_all=forest_apply_all,
-                            n_samples=n_samples, n_est=n_est)
-                        # add tree weights to overall forest weights
-                        forest_out = forest_out + tree_out
-                    # Divide by the number of trees to obtain final weights
-                    forest_out = forest_out / self.n_estimators
-                    # Compute predictions and assign to probs vector
-                    predictions = np.dot(forest_out, outcome_ind_est)
-                    probs[:, class_idx-1] = np.asarray(
-                            predictions.T).reshape(-1)
-                    # Save weights matrix
-                    weights[class_idx] = forest_out
-# =============================================================================
-# End of numpy_loop
-# =============================================================================
+                probs, weights = self.predict_weights(
+                    X=X, n_samples=n_samples)
             # create 2 distinct matrices with zeros and ones for easy subtraction
             # prepend vector of zeros
             probs_0 = np.hstack((np.zeros((n_samples, 1)), probs))
@@ -1121,6 +1060,7 @@ class OrderedForest:
             class_probs[class_probs < 0] = 0
             # normalize predictions to sum up to 1 after non-negativity correction
             class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
+            
             # Check desired type of predictions (applies only to cases where
             # inference = false)
             if prob:
@@ -1140,7 +1080,7 @@ class OrderedForest:
                 var_final = self.honest_variance(
                     probs=probs, weights=weights,
                     outcome_binary=outcome_binary_est, nclass=nclass,
-                    n_est=n_est)
+                    n_est=len(self.forest['ind_est']))
 
         # return the class predictions
         if not var_final is {}:
@@ -1151,29 +1091,54 @@ class OrderedForest:
 
     # %% Margin function
     # function to evaluate marginal effects with estimated ordered forest
-    def margin(self, X, window=0.1, verbose=False):
+    def margin(self, X, eval_point="mean", window=0.1, verbose=True):
         """
         Ordered Forest prediction.
 
         Parameters
         ----------
-        X : TYPE: pd.DataFrame
-            DESCRIPTION: matrix of covariates.
+        X : TYPE: array-like or NoneType
+            DESCRIPTION: Matrix of new covariates or None if covariates from
+            fit function should be used. If new data provided it must have
+            the same number of features as the X in the fit function.
+        eval_point: TYPE: string
+            DESCRIPTION: defining evaluation point for marginal effects. These
+            can be one of "mean", "atmean", or "atmedian". (Default is "mean")
         window : TYPE: float
             DESCRIPTION: share of standard deviation of X to be used for
             evaluation of the marginal effect. Default is 0.1.
         verbose : TYPE: bool
             DESCRIPTION: should be the results printed to console?
             Default is False.
+            
 
         Returns
         -------
         result: Mean marginal effects by Ordered Forest.
         """
-        # check if features X are a pandas dataframe
-        self.__xcheck(X)
-        # get a copy to avoid SettingWithCopyWarning
-        X_copy = X.copy()
+        
+        # Input checks
+        # check if input has been fitted (sklearn function)
+        check_is_fitted(self, attributes=["forest"])
+        
+        # Check if X defined properly (sklearn function)
+        if not X is None:
+            X = check_array(X)
+            # Check if number of variables matches with input in fit
+            if not X.shape[1]==self.n_features:
+                raise ValueError("Number of features (covariates) should be "
+                                 "%s but got %s. Provide \narray with the same"
+                                 " number of features as the X in the fit "
+                                 "function." % (self.n_features,X.shape[1]))
+            # Check if provided X exactly matches X used in fit function
+            if np.array_equal(X, self.forest['X_fit']):
+                X = None
+
+        # check whether to predict probabilities or classes
+        if not isinstance(verbose, bool):
+            # raise value error
+            raise ValueError("verbose must be of type boolean"
+                             ", got %s" % verbose)
 
         # check the window argument
         if isinstance(window, float):
@@ -1187,94 +1152,231 @@ class OrderedForest:
             raise ValueError("window must be a float"
                              ", got %s" % window)
 
-        # get the class labels
-        labels = list(self.forest['probs'].columns)
-        # define the window size share for evaluating the effect
-        h_std = window
-        # create empty dataframe to store marginal effects
-        margins = pd.DataFrame(index=X_copy.columns, columns=labels)
+        # check whether eval_point is defined correctly
+        if isinstance(eval_point, str):
+            if not (eval_point == 'mean' or eval_point == 'atmean' 
+                or eval_point == 'atmedian'):
+                # raise value error
+                raise ValueError("eval_point must be one of 'mean', 'atmean' " 
+                                 "or 'atmedian', got '%s'" % eval_point)
+        else:
+            # raise value error
+            raise ValueError("eval_point must be of type string"
+                             ", got %s" % eval_point)
+        
+        # get the indices of the honest sample
+        ind_est = self.forest['ind_est']
+        # get inference argument
+        inference = self.inference
+        
 
-        # loop over all covariates
-        for x_id in list(X_copy.columns):
-            # first check if its dummy, categorical or continuous
-            if list(np.sort(X_copy[x_id].unique())) == [0, 1]:
-                # compute the marginal effect as a discrete change in probs
-                # save original values of the dummy variable
-                dummy = np.array(X_copy[x_id])
-                # set x=1
-                X_copy[x_id] = 1
-                prob_x1 = self.predict(X=X_copy)
-                # set x=0
-                X_copy[x_id] = 0
-                prob_x0 = self.predict(X=X_copy)
-                # take the differences and columns means
-                effect = (prob_x1 - prob_x0).mean(axis=0)
-                # reset the dummy into the original values
-                X_copy[x_id] = dummy
+        ## Prepare data sets
+        # check if new data provided or not
+        if X is None:
+            # if no new data supplied, estimate in-sample marginal effects
+            if self.honesty:
+                # if using honesty, data refers to the honest sample
+                X_eval = self.forest['X_fit'][ind_est,:]
+                X_est = self.forest['X_fit'][ind_est,:]
             else:
-                # compute the marginal effect as continuous change in probs
-                # save original values of the continous variable
-                original = np.array(X_copy[x_id])
-                # get the min and max of x for the support check
-                x_min = original.min()
-                x_max = original.max()
-                # get the standard deviation of x for marginal effect
-                x_std = original.std()
-                # set x_up=x+h_std*x_std
-                x_up = original + (h_std * x_std)
-                # check if x_up is within the support of x
-                x_up = ((x_up < x_max) * x_up + (x_up >= x_max) * x_max)
-                x_up = ((x_up > x_min) * x_up + (x_up <= x_min) *
-                        (x_min + h_std * x_std))
-                # check if x is categorical and adjust to integers accordingly
-                if len(X_copy[x_id].unique()) <= 10:
-                    # set x_up=ceiling(x_up)
-                    x_up = np.ceil(x_up)
-                # replace the x with x_up
-                X_copy[x_id] = x_up
-                # get orf predictions
-                prob_x1 = self.predict(X=X_copy)
-                # set x_down=x-h_std*x_std
-                x_down = original - (h_std * x_std)
-                # check if x_down is within the support of x
-                x_down = ((x_down > x_min) * x_down + (x_down <= x_min) *
-                          x_min)
-                x_down = ((x_down < x_max) * x_down + (x_down >= x_max) *
-                          (x_max - h_std * x_std))
-                # check if x is categorical and adjust to integers accordingly
-                if len(X_copy[x_id].unique()) <= 10:
-                    # set x_down=ceiling(x_down) or x_down=floor(x_down)
-                    # adjustment such that the difference is always by 1 value
-                    x_down[np.ceil(x_down) == np.ceil(x_up)] = np.floor(
-                        x_down[np.ceil(x_down) == np.ceil(x_up)])
-                    x_down[np.ceil(x_down) != np.ceil(x_up)] = np.ceil(
-                        x_down[np.ceil(x_down) != np.ceil(x_up)])
-                # replace the x with x_down
-                X_copy[x_id] = x_down
-                # get orf predictions
-                prob_x0 = self.predict(X=X_copy)
-                # take the differences, scale them and take columns means
-                diff = prob_x1 - prob_x0
-                # define scaling parameter
-                scale = pd.Series((x_up - x_down), index=X_copy.index)
-                # rescale the differences and take the column means
-                effect = diff.divide(scale, axis=0).mean(axis=0)
-                # reset x into the original values
-                X_copy[x_id] = original
-            # assign the effects into the output dataframe
-            margins.loc[x_id, :] = effect
-
+                # if not using honesty, data refers to the full sample
+                X_eval = self.forest['X_fit']
+                X_est = self.forest['X_fit']
+        else:
+            # if new data supplied, need to use this for prediction
+            if self.honesty:
+                # if using honesty, need to consider new and honest sample
+                X_eval = X
+                X_est = self.forest['X_fit'][ind_est,:]
+            else:
+                # if not using honesty, data refers to the new sample
+                X_eval = X
+                X_est = self.forest['X_fit']
+        # get the number of observations in X
+        n_samples = _num_samples(X_eval)
+        # define the window size share for evaluating the effect
+        h_std = window    
+        
+        # check if X is continuous, dummy or categorical
+        # first find number of unique values per column
+        X_eval_sort = np.sort(X_eval,axis=0)
+        n_unique = (X_eval_sort[1:,:] != X_eval_sort[:-1,:]).sum(axis=0)+1
+        # get indices of respective columns
+        X_dummy = (n_unique == 2).nonzero()
+        X_categorical = ((n_unique > 2) & (n_unique <= 10)).nonzero()
+        if np.any(n_unique<= 1):
+            # raise value error
+            raise ValueError("Some of the covariates are constant. This is "
+                             "not allowed for evaluation of marginal effects. "
+                             "Programme terminated.")
+        
+        ## Get the evaluation point(s)
+        # Save evaluation point(s) in X_mean
+        if eval_point == "atmean":
+            X_mean = np.mean(X_eval, axis=0).reshape(1,-1)
+        elif eval_point == "atmedian":
+            X_mean = np.median(X_eval, axis=0).reshape(1,-1)
+        else:
+            X_mean = X_eval.copy()
+        # Get dimension of evaluation points
+        X_rows = np.shape(X_mean)[0]
+        X_cols = np.shape(X_mean)[1]
+        # Get standard deviation of X_est in the same shape as X_mean
+        X_sd = np.repeat(np.std(X_est, axis=0, ddof=1).reshape(1,-1
+                                                               ),X_rows, axis=0)
+        # create X_up (X_mean + h_std * X_sd)
+        X_up = X_mean + h_std*X_sd
+        # create X_down (X_mean - h_std * X_sd)
+        X_down = X_mean - h_std*X_sd
+            
+        ## now check if support of X_eval is within X_est
+        # check X_max
+        X_max = np.repeat(np.max(X_est, axis=0).reshape(1,-1),X_rows, axis=0)
+        # check X_min
+        X_min = np.repeat(np.min(X_est, axis=0).reshape(1,-1),X_rows, axis=0)
+        # check if X_up is within the range X_min and X_max
+        # If some X_up is larger than the max in X_est, replace entry in X_up 
+        # by this max value of X_est. If some X_up is smaller than the min in
+        # X_est, replace entry in X_up by this min value + h_std * X_sd
+        X_up = (X_up < X_max) * X_up + (X_up >= X_max) * X_max
+        X_up = (X_up > X_min) * X_up + (X_up <= X_min) * (X_min + h_std * X_sd)
+        # check if X_down is within the range X_min and X_max
+        X_down = (X_down > X_min) * X_down + (X_down <= X_min) * X_min
+        X_down = (X_down < X_max) * X_down + (X_down >= X_max) *(
+            X_max - h_std * X_sd)
+        # check if X_up and X_down are same
+        if (np.any(X_up == X_down)):
+            # adjust to higher share of SD
+            X_up = (X_up > X_down) * X_up + (X_up == X_down) * (
+                X_up + 0.5 * h_std * X_sd)
+            X_down = (X_up > X_down) * X_down + (X_up == X_down) * (
+                X_down - 0.5 * h_std * X_sd)
+            # check the min max range again
+            X_up = (X_up < X_max) * X_up + (X_up >= X_max) * X_max
+            X_down = (X_down > X_min) * X_down + (X_down <= X_min) * X_min
+        
+        # Adjust for dummies
+        X_up[:, X_dummy] = np.max(X_eval[:, X_dummy], axis=0)
+        X_down[:, X_dummy] = np.min(X_eval[:, X_dummy], axis=0)
+        
+        # Adjust for categorical variables
+        X_up[:, X_categorical] = np.ceil(X_up[:, X_categorical])
+        X_down[:, X_categorical] = X_up[:, X_categorical]-1
+        
+        ## Compute predictions
+        # Create storage dicts to save predictions
+        forest_pred_up = np.empty((X_cols, self.n_class-1))
+        forest_pred_down = np.empty((X_cols, self.n_class-1))
+        # Case 1: No honeste (= no inference)
+        if not self.honesty:
+            # loop over all covariates
+            for x_id in range(X_cols):
+                # Prepare input matrix where column x_id is adjusted upwards
+                X_mean_up = X_eval.copy()
+                X_mean_up[:,x_id] = X_up[:,x_id]
+                # Compute mean predictions (only needed for eval_point=mean
+                # but no change im atmean or atmedian)
+                forest_pred_up[x_id,:] = np.mean(self.predict_default(
+                    X=X_mean_up, n_samples=n_samples), axis=0)
+                # Prepare input matrix where column x_id is adjusted downwards
+                X_mean_down = X_eval.copy()
+                X_mean_down[:,x_id] = X_down[:,x_id]
+                # Compute mean predictions
+                forest_pred_down[x_id,:] = np.mean(self.predict_default(
+                    X=X_mean_down, n_samples=n_samples), axis=0)
+        if self.honesty and not inference:
+            # loop over all covariates
+            for x_id in range(X_cols):
+                # Prepare input matrix where column x_id is adjusted upwards
+                X_mean_up = X_eval.copy()
+                X_mean_up[:,x_id] = X_up[:,x_id]
+                # Compute mean predictions (only needed for eval_point=mean
+                # but no change im atmean or atmedian)
+                forest_pred_up[x_id,:] = np.mean(self.predict_leafmeans(
+                    X=X_mean_up, n_samples=n_samples), axis=0)
+                # Prepare input matrix where column x_id is adjusted downwards
+                X_mean_down = X_eval.copy()
+                X_mean_down[:,x_id] = X_down[:,x_id]
+                # Compute mean predictions
+                forest_pred_down[x_id,:] = np.mean(self.predict_leafmeans(
+                    X=X_mean_down, n_samples=n_samples), axis=0)
+        if self.honesty and inference:
+            # loop over all covariates
+            for x_id in range(X_cols):
+                # Prepare input matrix where column x_id is adjusted upwards
+                X_mean_up = X_eval.copy()
+                X_mean_up[:,x_id] = X_up[:,x_id]
+                # Compute mean predictions (only needed for eval_point=mean
+                # but no change im atmean or atmedian)
+                forest_pred_up[x_id,:] = np.mean(self.predict_weights(
+                    X=X_mean_up, n_samples=n_samples)[0], axis=0)
+                # Prepare input matrix where column x_id is adjusted downwards
+                X_mean_down = X_eval.copy()
+                X_mean_down[:,x_id] = X_down[:,x_id]
+                # Compute mean predictions
+                forest_pred_down[x_id,:] = np.mean(self.predict_weights(
+                    X=X_mean_down, n_samples=n_samples)[0], axis=0)
+        # ORF predictions for forest_pred_up
+        # create 2 distinct matrices with zeros and ones for easy subtraction
+        # prepend vector of zeros
+        forest_pred_up_0 = np.hstack((np.zeros((X_cols, 1)), forest_pred_up))
+        # postpend vector of ones
+        forest_pred_up_1 = np.hstack((forest_pred_up, np.ones((X_cols, 1))))
+        # difference out the adjacent categories to singleout the class probs
+        forest_pred_up = forest_pred_up_1 - forest_pred_up_0
+        # check if some probabilities become negative and set them to zero
+        forest_pred_up[forest_pred_up < 0] = 0
+        # normalize predictions to sum up to 1 after non-negativity correction
+        forest_pred_up = forest_pred_up / forest_pred_up.sum(
+            axis=1).reshape(-1, 1)
+        # ORF predictions for forest_pred_down
+        # create 2 distinct matrices with zeros and ones for easy subtraction
+        # prepend vector of zeros
+        forest_pred_down_0 = np.hstack((np.zeros((X_cols, 1)), forest_pred_down))
+        # postpend vector of ones
+        forest_pred_down_1 = np.hstack((forest_pred_down, np.ones((X_cols, 1))))
+        # difference out the adjacent categories to singleout the class probs
+        forest_pred_down = forest_pred_down_1 - forest_pred_down_0
+        # check if some probabilities become negative and set them to zero
+        forest_pred_down[forest_pred_down < 0] = 0
+        # normalize predictions to sum up to 1 after non-negativity correction
+        forest_pred_down = forest_pred_down / forest_pred_down.sum(
+            axis=1).reshape(-1, 1)
+        
+        ## Compute marginal effects from predictions
+        # compute difference between up and down (numerator)
+        forest_pred_diff_up_down = forest_pred_up - forest_pred_down
+        # compute scaling factor (denominator)
+        scaling_factor = np.mean(X_up - X_down, axis=0).reshape(-1,1)
+        # Set scaling factor to 1 for categorical and dummy variables
+        scaling_factor[X_dummy,:] = 1
+        scaling_factor[X_categorical,:] = 1
+        # Scale the differences to get the marginal effects
+        marginal_effects_scaled = forest_pred_diff_up_down / scaling_factor
+        
         # redefine all effect results as floats
-        margins = margins.astype(float)
+        margins = marginal_effects_scaled.astype(float)
 
         # check if marginal effects should be printed
         if verbose:
+            string_seq_X = [str(x) for x in np.arange(1,X_cols+1)]
+            string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
             # print marginal effects nicely
             print('Ordered Forest: Mean Marginal Effects', '-' * 80,
-                  margins, '-' * 80, '\n\n', sep='\n')
+                  pd.DataFrame(data=margins, 
+                               index=['X' + sub for sub in string_seq_X], 
+                               columns=['Cat' + sub for sub in string_seq_cat]),
+                  '-' * 80, '\n\n', sep='\n')
 
-        # return marginal effects
-        return margins
+# =============================================================================
+# Question Gabriel:
+#    - X_sd based on X_est -> is this true?
+#    - Balance check, switch to 0.5 why? what if check in the end fails? 
+#    - while loop?
+#    - categorical variables: why don't just subtract 1?
+# =============================================================================
+        
+       
 
     # %% Performance functions
     # performance measures (private method, not available to user)
@@ -1522,6 +1624,85 @@ class OrderedForest:
 #             forest_out = forest_out + tree_out
 #             return forest_out
 # =============================================================================
+
+    #Function to predict via sklearn
+    def predict_default(self, X, n_samples):
+        # create an empty array to save the predictions
+        probs = np.empty((n_samples, self.n_class-1))
+        for class_idx in range(1, self.n_class, 1):
+            # get in-sample predictions, i.e. out-of-bag predictions
+            probs[:,class_idx-1] = self.forest['forests'][class_idx].predict(
+                X=X).squeeze() 
+        return probs
+        
+
+    #Function to predict via leaf means
+    def predict_leafmeans(self, X, n_samples):
+        # create an empty array to save the predictions
+        probs = np.empty((n_samples, self.n_class-1))
+        # Run new Xs through estimated train forest and compute 
+        # predictions based on honest sample. No need to predict
+        # weights, get predictions directly through leaf means.
+        # Loop over classes
+        for class_idx in range(1, self.n_class, 1):
+            # Get leaf IDs for new data set
+            forest_apply = self.forest['forests'][class_idx].apply(X)
+            # generate grid to read out indices column by column
+            grid = np.meshgrid(np.arange(0, self.n_estimators), 
+                               np.arange(0, n_samples))[0]
+            # assign leaf means to indices
+            y_hat = self.forest['fitted'][class_idx][forest_apply, grid]
+            # Average over trees
+            probs[:, class_idx-1] = np.mean(y_hat, axis=1)  
+        return probs
+
+        
+    #Function to predict via weights
+    def predict_weights(self, X, n_samples):
+        # create an empty array to save the predictions
+        probs = np.empty((n_samples, self.n_class-1))
+        # create empty dict to save weights
+        weights = {}
+        # Step 1: Predict weights by using honest data from fit and
+        # newdata (for each category except one)
+        # First extract honest data from fit output
+        X_est = self.forest['X_fit'][self.forest['ind_est'],:]
+        # Loop over classes
+        for class_idx in range(1, self.n_class, 1):
+            # Get leaf IDs for estimation set
+            forest_apply = self.forest['forests'][class_idx].apply(X_est)
+            # create binary outcome indicator for est sample
+            outcome_ind_est = self.forest['outcome_binary_est'][class_idx]
+            # Get size of estimation sample
+            n_est = forest_apply.shape[0]
+            # Get leaf IDs for newdata
+            forest_apply_all = self.forest['forests'][class_idx].apply(X)
+# =============================================================================
+# In the end: insert here weight.method which works best. For now numpy_loop
+# =============================================================================
+            # self.weight_method == 'numpy_loop':
+            # generate storage matrix for weights
+            forest_out = np.zeros((n_samples, n_est))
+            # Loop over trees
+            for tree in range(self.n_estimators):
+                tree_out = self.honest_weight_numpy(
+                    tree=tree, forest_apply=forest_apply, 
+                    forest_apply_all=forest_apply_all,
+                    n_samples=n_samples, n_est=n_est)
+                # add tree weights to overall forest weights
+                forest_out = forest_out + tree_out
+            # Divide by the number of trees to obtain final weights
+            forest_out = forest_out / self.n_estimators
+            # Compute predictions and assign to probs vector
+            predictions = np.dot(forest_out, outcome_ind_est)
+            probs[:, class_idx-1] = np.asarray(predictions.T).reshape(-1)
+            # Save weights matrix
+            weights[class_idx] = forest_out
+# =============================================================================
+# End of numpy_loop
+# =============================================================================
+        return probs, weights
+
 
     # Function to compute variance of predictions.
     # -> Does the N in the formula refer to n_samples or to n_est?
