@@ -25,6 +25,7 @@ from functools import partial
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_X_y, check_array
 from sklearn.utils.validation import _num_samples, _num_features, check_is_fitted
+from scipy import stats
 # from numba import jit, njit, types, vectorize
 
 # %% Class definition
@@ -1012,12 +1013,12 @@ class OrderedForest:
         inference = self.inference
         
         # Check if prob allows to do inference
-        if ((not prob) and (inference)):
-            print('-' * 60, 
+        if ((not prob) and (inference) and (X is not None)):
+            print('-' * 70, 
                   'WARNING: Inference is not possible if prob=False.' 
-                  '\nClass predictions might be obtained considerably faster '
-                  'when \nusing OrderedForest with option inference=False.', 
-                  '-' * 60, sep='\n')
+                  '\nClass predictions for large samples might be obtained faster '
+                  '\nwhen re-estimating OrderedForest with option inference=False.', 
+                  '-' * 70, sep='\n')
 
         # Initialize final variance output
         var_final = {}
@@ -1301,21 +1302,37 @@ class OrderedForest:
                 forest_pred_down[x_id,:] = np.mean(self.predict_leafmeans(
                     X=X_mean_down, n_samples=n_samples), axis=0)
         if self.honesty and inference:
+            # storage container for weight matrices
+            forest_weights_up={}
+            forest_weights_down={}
             # loop over all covariates
             for x_id in range(X_cols):
                 # Prepare input matrix where column x_id is adjusted upwards
                 X_mean_up = X_eval.copy()
                 X_mean_up[:,x_id] = X_up[:,x_id]
+                # Compute predictions amd weights matrix
+                forest_pred_up_x_id, forest_weights_up[x_id] = (
+                    self.predict_weights(X=X_mean_up, n_samples=n_samples))
                 # Compute mean predictions (only needed for eval_point=mean
                 # but no change im atmean or atmedian)
-                forest_pred_up[x_id,:] = np.mean(self.predict_weights(
-                    X=X_mean_up, n_samples=n_samples)[0], axis=0)
+                forest_pred_up[x_id,:] = np.mean(forest_pred_up_x_id, axis=0)
                 # Prepare input matrix where column x_id is adjusted downwards
                 X_mean_down = X_eval.copy()
                 X_mean_down[:,x_id] = X_down[:,x_id]
-                # Compute mean predictions
-                forest_pred_down[x_id,:] = np.mean(self.predict_weights(
-                    X=X_mean_down, n_samples=n_samples)[0], axis=0)
+                # Compute predictions amd weights matrix
+                forest_pred_down_x_id, forest_weights_down[x_id] = (
+                    self.predict_weights(X=X_mean_down, n_samples=n_samples))
+                # Compute mean predictions (only needed for eval_point=mean
+                # but no change im atmean or atmedian)
+                forest_pred_down[x_id,:] = np.mean(
+                    forest_pred_down_x_id, axis=0)
+            # Compute means of weights
+            forest_weights_up = {r: {k: np.mean(v, axis=0) for k,v in 
+                                     forest_weights_up[r].items()} for r in 
+                                 forest_weights_up.keys()}
+            forest_weights_down = {r: {k: np.mean(v, axis=0) for k,v in 
+                                     forest_weights_down[r].items()} for r in 
+                                 forest_weights_down.keys()}
         # ORF predictions for forest_pred_up
         # create 2 distinct matrices with zeros and ones for easy subtraction
         # prepend vector of zeros
@@ -1356,17 +1373,146 @@ class OrderedForest:
         
         # redefine all effect results as floats
         margins = marginal_effects_scaled.astype(float)
-
+        
+        if inference:
+            ## variance for the marginal effects
+            # compute prerequisities for variance of honest marginal effects
+            # squared scaling factor
+            scaling_factor_squared = np.square(scaling_factor)
+            # Get the size of the honest sample
+            n_est = len(ind_est)
+            # Create storage container for variance
+            variance_me = np.empty((X_cols, self.n_class))
+            # loop over all covariates
+            for x_id in range(X_cols):
+                # Generate sub-dictionary
+                # Create storage containers
+                forest_multi_demeaned = {}
+                variance = {}
+                covariance = {}
+                # Loop over classes
+                for class_idx in range(1, self.n_class, 1):
+                    #subtract the weights according to the ME formula:
+                    forest_weights_diff_up_down = (
+                        forest_weights_up[x_id][class_idx] - 
+                        forest_weights_down[x_id][class_idx])
+                    # Get binary outcoms of honest sample
+                    outcome_binary_est = self.forest['outcome_binary_est'][
+                        class_idx].reshape(-1,1)
+                    # compute the conditional means: 1/N(weights%*%y) (predictions are based on honest sample)
+                    forest_cond_means = np.multiply(
+                        (1/len(self.forest['ind_est'])), np.dot(
+                            forest_weights_diff_up_down, outcome_binary_est))
+                    # calculate standard multiplication of weights and outcomes
+                    forest_multi = np.multiply(
+                        forest_weights_diff_up_down, outcome_binary_est.reshape((1, -1)))
+                    # subtract the mean from each obs i
+                    forest_multi_demeaned[class_idx] = forest_multi - forest_cond_means
+                    # compute the square
+                    forest_multi_demeaned_sq = np.square(
+                        forest_multi_demeaned[class_idx])
+                    # sum over all i in honest sample
+                    forest_multi_demeaned_sq_sum = np.sum(
+                        forest_multi_demeaned_sq, axis=1)
+                    # multiply by N/N-1 (normalize)
+                    forest_multi_demeaned_sq_sum_norm = (
+                        forest_multi_demeaned_sq_sum * (n_est/(n_est-1)))
+                    # divide by scaling factor to get the variance
+                    variance[class_idx] = (
+                        forest_multi_demeaned_sq_sum_norm/
+                                scaling_factor_squared[x_id])
+                # ### Covariance computation:
+                # Shift categories for computational convenience
+                # Postpend matrix of zeros
+                forest_multi_demeaned_0_last = forest_multi_demeaned
+                forest_multi_demeaned_0_last[self.n_class] = np.zeros(
+                    forest_multi_demeaned_0_last[1].shape)
+                # Prepend matrix of zeros
+                forest_multi_demeaned_0_first = {}
+                forest_multi_demeaned_0_first[1] = np.zeros(
+                    forest_multi_demeaned[1].shape)
+                # Shift existing matrices by 1 class
+                for class_idx in range(1, self.n_class, 1):
+                    forest_multi_demeaned_0_first[
+                        class_idx+1] = forest_multi_demeaned[class_idx]
+                # Loop over classes
+                for class_idx in range(1, self.n_class+1, 1):
+                    # multiplication of category m with m-1
+                    forest_multi_demeaned_cov = np.multiply(
+                        forest_multi_demeaned_0_first[class_idx],
+                        forest_multi_demeaned_0_last[class_idx])
+                    # sum all obs i in honest sample
+                    forest_multi_demeaned_cov_sum = np.sum(
+                        forest_multi_demeaned_cov, axis=1)
+                    # multiply by (N/N-1)*2
+                    forest_multi_demeaned_cov_sum_norm_mult2 = (
+                        forest_multi_demeaned_cov_sum*2*(
+                        n_est/(n_est-1)))
+                    # divide by scaling factor to get the covariance
+                    covariance[class_idx] = (
+                        forest_multi_demeaned_cov_sum_norm_mult2/
+                        scaling_factor_squared[x_id])
+                # ### Put everything together
+                # Shift categories for computational convenience
+                # Postpend matrix of zeros
+                variance_last = variance.copy()
+                variance_last[self.n_class] = np.zeros(variance_last[1].shape)
+                # Prepend matrix of zeros
+                variance_first = {}
+                variance_first[1] = np.zeros(variance[1].shape)
+                # Shift existing matrices by 1 class
+                for class_idx in range(1, self.n_class, 1):
+                    variance_first[class_idx+1] = variance[class_idx]
+                # Compute final variance according to: var_last + var_first - cov
+                for class_idx in range(1, self.n_class+1, 1):
+                    variance_me[x_id,class_idx-1]  = variance_last[
+                            class_idx].reshape(-1, 1) + variance_first[
+                            class_idx].reshape(-1, 1) - covariance[
+                                class_idx].reshape(-1, 1)    
+            # standard deviations
+            sd_me = np.sqrt(variance_me)     
+            # t values and p values (control for division by zero)
+            t_values = np.divide(margins, sd_me, out=np.zeros_like(margins), 
+                                where=sd_me!=0)
+            # p values
+            p_values = 2*stats.norm.sf(np.abs(t_values))
+        else:
+            # no values for the other parameters if inference is not desired
+            variance_me = None
+            sd_me = None
+            t_values = None
+            p_values = None
+        # put everything into a list of results
+        results = {'eval_point': eval_point,
+                   'effects': margins,
+                   'variances': variance_me,
+                   'std_errors': sd_me,
+                   't-values': t_values,
+                   'p-values': p_values}
         # check if marginal effects should be printed
         if verbose:
             string_seq_X = [str(x) for x in np.arange(1,X_cols+1)]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
             # print marginal effects nicely
-            print('Ordered Forest: Mean Marginal Effects', '-' * 80,
-                  pd.DataFrame(data=margins, 
-                               index=['X' + sub for sub in string_seq_X], 
-                               columns=['Cat' + sub for sub in string_seq_cat]),
-                  '-' * 80, '\n\n', sep='\n')
+            if not inference:
+                print('Marginal Effects of Ordered Forest, evaluation point: '+ 
+                      eval_point, '-' * 80, 'Effects:', '-' * 80,
+                      pd.DataFrame(data=margins, 
+                                   index=['X' + sub for sub in string_seq_X], 
+                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                      '-' * 80, '\n\n', sep='\n')
+            else:
+                print('Marginal Effects of Ordered Forest, evaluation point: '+ 
+                      eval_point, '-' * 80, 'Effects:', '-' * 80,
+                      pd.DataFrame(data=margins, 
+                                   index=['X' + sub for sub in string_seq_X], 
+                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                      '-' * 80,'Standard errors:', '-' * 80,
+                      pd.DataFrame(data=sd_me, 
+                                   index=['X' + sub for sub in string_seq_X], 
+                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                      '-' * 80, '\n\n', sep='\n')
+        return results
 
 # =============================================================================
 # Question Gabriel:
