@@ -17,8 +17,8 @@ import sharedmem
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from econml.grf import RegressionForest
-import orf.honest_fit as honest_fit
-from joblib import Parallel, delayed
+#import orf.honest_fit as honest_fit
+from joblib import Parallel, delayed, parallel_backend
 from multiprocessing import Pool, cpu_count, Lock
 from mpire import WorkerPool
 from functools import partial
@@ -26,6 +26,7 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state, check_X_y, check_array
 from sklearn.utils.validation import _num_samples, _num_features, check_is_fitted
 from scipy import stats
+import ray
 # from numba import jit, njit, types, vectorize
 
 # %% Class definition
@@ -250,6 +251,7 @@ class OrderedForest:
                 or pred_method == 'numpy_loop_multi'
                 or pred_method == 'numpy_loop_mpire'
                 or pred_method == 'numpy_sparse'
+                or pred_method == 'numpy_loop_ray'
                 or pred_method == 'numpy_sparse2'):
             # assign the input value
             self.pred_method = pred_method
@@ -257,6 +259,11 @@ class OrderedForest:
             # raise value error
             raise ValueError("pred_method must be of cython, loop or numpy"
                              ", got %s" % pred_method)
+        
+        if self.pred_method == 'numpy_loop_ray':
+            # Initialize ray
+            ray.init(num_cpus=self.n_jobs, ignore_reinit_error=True)
+        
 
         # check whether weight_method is defined correctly
         if (weight_method == 'numpy_loop'
@@ -822,11 +829,24 @@ class OrderedForest:
                             # assign the honest predictions, i.e. fitted values
                             fitted[class_idx] = leaf_means
 
+                        # if self.pred_method == 'numpy_loop':
+                        #     # Loop over trees
+                        #     leaf_means = Parallel(n_jobs=self.n_jobs,
+                        #                           backend="loky")(
+                        #         delayed(self.honest_fit_numpy_func)(
+                        #             tree=tree,
+                        #             forest_apply=forest_apply,
+                        #             outcome_ind_est=outcome_ind_est,
+                        #             max_id=max_id) for tree in range(
+                        #                 0, self.n_estimators))
+                        #     # assign honest predictions, i.e. fitted values
+                        #     fitted[class_idx] = np.vstack(leaf_means).T
+                            
                         if self.pred_method == 'numpy_loop':
                             # Loop over trees
-                            leaf_means = Parallel(n_jobs=self.n_jobs,
-                                                  backend="loky")(
-                                delayed(self.honest_fit_numpy_func)(
+                            with parallel_backend('threading', n_jobs=self.n_jobs):
+                                leaf_means = Parallel()(
+                                    delayed(self.honest_fit_numpy_func)(
                                     tree=tree,
                                     forest_apply=forest_apply,
                                     outcome_ind_est=outcome_ind_est,
@@ -834,6 +854,19 @@ class OrderedForest:
                                         0, self.n_estimators))
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
+                            
+                        if self.pred_method == 'numpy_loop_ray':
+                            # Loop over trees
+                            leaf_means = (ray.get(
+                                [honest_fit_numpy_func_out.remote(
+                                    tree=tree,
+                                    forest_apply=forest_apply,
+                                    outcome_ind_est=outcome_ind_est,
+                                    max_id=max_id) for tree in range(
+                                        0, self.n_estimators)]))
+                            # assign honest predictions, i.e. fitted values
+                            fitted[class_idx] = np.vstack(leaf_means).T
+
 
                         # Check whether to use multiprocessing or not
                         if self.pred_method == 'numpy_loop_multi':
@@ -851,6 +884,7 @@ class OrderedForest:
                             pool.join()  # join parallel
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
+
 
                         if self.pred_method == 'numpy_loop_mpire':
                             # define partial function by fixing parameters
@@ -2115,7 +2149,7 @@ def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
             leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
     return leaf_means
 
-
+@ray.remote
 def honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
     """Compute the honest leaf means using numpy."""
     # create an empty array to save the leaf means
@@ -2215,3 +2249,5 @@ def forest_weights_mpire(partial_fun, n_samples, n_est, n_jobs, n_estimators):
     pool.map(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
     pool.stop_and_join()  # stop and join pool
     return forest_out
+
+

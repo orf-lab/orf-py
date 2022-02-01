@@ -9,8 +9,8 @@ import time
 from econml.grf import RegressionForest
 import timeit
 
-# path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
-path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+# path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 # path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
 os.chdir(path)
 
@@ -320,3 +320,139 @@ for n_sample in sample_sizes:
 
 pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire',
                                 'numpy_loop_shared_multi', 'numpy_loop_shared_mpire']).T
+
+
+
+# =============================================================================
+# Tests on windows
+# =============================================================================
+
+# test prediction without inference with and without mpire
+
+# compare numpy_loop with n_jobs=1 vs. n_jobs=-1 (= joblib version)
+
+sample_sizes = [1000, 5000, 100000]
+time_table = {}
+
+for n_sample in sample_sizes:
+    # Generate data set
+    features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+
+    oforest_loop_p1 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=False, random_state=123)
+    test_loop_p1 = %timeit -r3 -o oforest_loop_p1.fit(X=features, y=outcome)
+    
+    oforest_loop_m1 = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=-1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=False, random_state=123)
+    test_loop_m1 = %timeit -r3 -o oforest_loop_m1.fit(X=features, y=outcome)
+
+
+    time_table[n_sample] = [test_loop_p1.average, test_loop_m1.average]
+
+pd.DataFrame(time_table, index=['numpy_loop_p1', 'numpy_loop_m1']).T
+
+# =============================================================================
+#        numpy_loop_p1   numpy_loop_m1
+# 1000        5.784630        7.271092
+# 5000       10.728362       12.359371
+# 100000     234.585029     284.790578
+# =============================================================================
+
+
+
+# test leafmean predictions (without weights) with and without mpire
+sample_sizes = [1000, 5000, 10000]
+time_table = {}
+
+for n_sample in sample_sizes:
+    # Generate data set
+    features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+
+    oforest_loop = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=False, random_state=123)
+    test_loop = %timeit -o oforest_loop.fit(X=features, y=outcome)
+
+
+    oforest_mpire = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=-1, pred_method='numpy_loop_mpire',
+                                 weight_method='numpy_loop_mpire',
+                                 inference=False, random_state=123)
+    test_mpire = %timeit -o oforest_mpire.fit(X=features, y=outcome)
+
+
+    time_table[n_sample] = [test_loop.average, test_mpire.average]
+
+pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire']).T
+
+# =============================================================================
+#        numpy_loop  numpy_loop_mpire
+# 1000     2.623892         26.517618
+# 5000     3.596580         26.616825
+# 10000    6.447010         35.683605
+# =============================================================================
+
+
+
+# test prediction with inference with and without mpire
+sample_sizes = [1000, 5000, 10000]
+time_table = {}
+
+for n_sample in sample_sizes:
+    # Generate data set
+    features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+
+    oforest_loop = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=True, random_state=123)
+    test_loop = %timeit -o oforest_loop.fit(X=features, y=outcome)
+
+
+    oforest_mpire = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=-1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop_mpire',
+                                 inference=True, random_state=123)
+    test_mpire = %timeit -o oforest_mpire.fit(X=features, y=outcome)
+
+
+    oforest_shared_mpire = OrderedForest(n_estimators=500, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=-1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop_shared_mpire',
+                                 inference=True, random_state=123)
+    test_shared_mpire = %timeit -o oforest_shared_mpire.fit(X=features, y=outcome)
+
+    time_table[n_sample] = [test_loop.average, test_mpire.average,
+                            test_shared_multi.average, test_shared_mpire.average]
+
+pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire',
+                                'numpy_loop_shared_multi', 'numpy_loop_shared_mpire']).T
+
+# =============================================================================
+# Doesn't stop...
+# =============================================================================
