@@ -1121,7 +1121,7 @@ class OrderedForest:
         if not var_final is {}:
             result = (pred_final, var_final)
         else:
-            result = pred_final
+            result = (pred_final, None)
         return result
 
     # %% Margin function
@@ -1299,10 +1299,10 @@ class OrderedForest:
         X_down[:, X_categorical] = X_up[:, X_categorical]-1
         
         ## Compute predictions
-        # Create storage dicts to save predictions
+        # Create storage arrays to save predictions
         forest_pred_up = np.empty((X_cols, self.n_class-1))
         forest_pred_down = np.empty((X_cols, self.n_class-1))
-        # Case 1: No honeste (= no inference)
+        # Case 1: No honesty (= no inference)
         if not self.honesty:
             # loop over all covariates
             for x_id in range(X_cols):
@@ -1344,7 +1344,7 @@ class OrderedForest:
                 # Prepare input matrix where column x_id is adjusted upwards
                 X_mean_up = X_eval.copy()
                 X_mean_up[:,x_id] = X_up[:,x_id]
-                # Compute predictions amd weights matrix
+                # Compute predictions and weights matrix
                 forest_pred_up_x_id, forest_weights_up[x_id] = (
                     self.predict_weights(X=X_mean_up, n_samples=n_samples))
                 # Compute mean predictions (only needed for eval_point=mean
@@ -1353,7 +1353,7 @@ class OrderedForest:
                 # Prepare input matrix where column x_id is adjusted downwards
                 X_mean_down = X_eval.copy()
                 X_mean_down[:,x_id] = X_down[:,x_id]
-                # Compute predictions amd weights matrix
+                # Compute predictions and weights matrix
                 forest_pred_down_x_id, forest_weights_down[x_id] = (
                     self.predict_weights(X=X_mean_down, n_samples=n_samples))
                 # Compute mean predictions (only needed for eval_point=mean
@@ -1548,15 +1548,6 @@ class OrderedForest:
                       '-' * 80, '\n\n', sep='\n')
         return results
 
-# =============================================================================
-# Question Gabriel:
-#    - X_sd based on X_est -> is this true?
-#    - Balance check, switch to 0.5 why? what if check in the end fails? 
-#    - while loop?
-#    - categorical variables: why don't just subtract 1?
-# =============================================================================
-        
-       
 
     # %% Performance functions
     # performance measures (private method, not available to user)

@@ -456,3 +456,85 @@ pd.DataFrame(time_table, index=['numpy_loop', 'numpy_loop_mpire',
 # =============================================================================
 # Doesn't stop...
 # =============================================================================
+
+
+
+# test leafmean predictions (without weights) for different numbers of trees
+ntrees = [100, 500, 1000, 2000, 5000, 10000]
+time_table = {}
+
+for ntree in ntrees:
+    # Generate data set
+    features, outcome = example_data(seed=123, n=10000, p_cont=1, p_cat=1,
+                                     p_binary=1, noise=True, y_cat=3,
+                                     cat_cat=3)
+
+    oforest_loop_p1 = OrderedForest(n_estimators=ntree, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=False, random_state=123)
+    test_loop_p1 = %timeit -r3 -o oforest_loop_p1.fit(X=features, y=outcome)
+    
+    oforest_loop_m1 = OrderedForest(n_estimators=ntree, min_samples_leaf=5,
+                                 max_features=0.5, replace=False,
+                                 sample_fraction=0.5, honesty=True,
+                                 n_jobs=-1, pred_method='numpy_loop',
+                                 weight_method='numpy_loop',
+                                 inference=False, random_state=123)
+    test_loop_m1 = %timeit -r3 -o oforest_loop_m1.fit(X=features, y=outcome)
+
+
+# =============================================================================
+#     oforest_mpire = OrderedForest(n_estimators=ntree, min_samples_leaf=5,
+#                                  max_features=0.5, replace=False,
+#                                  sample_fraction=0.5, honesty=True,
+#                                  n_jobs=-1, pred_method='numpy_loop_mpire',
+#                                  weight_method='numpy_loop',
+#                                  inference=False, random_state=123)
+#     test_mpire = %timeit -r3 -o oforest_mpire.fit(X=features, y=outcome)
+# =============================================================================
+    
+# =============================================================================
+#     oforest_ray = OrderedForest(n_estimators=ntree, min_samples_leaf=5,
+#                                  max_features=0.5, replace=False,
+#                                  sample_fraction=0.5, honesty=True,
+#                                  n_jobs=-1, pred_method='numpy_loop_ray',
+#                                  weight_method='numpy_loop',
+#                                  inference=False, random_state=123)
+#     test_ray = %timeit -r3 -o oforest_ray.fit(X=features, y=outcome)
+#     
+#     oforest_ray_p1 = OrderedForest(n_estimators=ntree, min_samples_leaf=5,
+#                                  max_features=0.5, replace=False,
+#                                  sample_fraction=0.5, honesty=True,
+#                                  n_jobs=1, pred_method='numpy_loop_ray',
+#                                  weight_method='numpy_loop',
+#                                  inference=False, random_state=123)
+#     test_ray_p1 = %timeit -r3 -o oforest_ray_p1.fit(X=features, y=outcome)
+# =============================================================================
+
+
+
+    time_table[ntree] = [test_loop_p1.average, test_loop_m1.average,
+                            test_ray.average, test_ray_p1.average]
+
+pd.DataFrame(time_table, index=['numpy_loop_p1', 'numpy_loop_m1', 
+                                'numpy_loop_ray_m1', 
+                                'numpy_loop_ray_p1'])
+
+# =============================================================================
+# N=1000             Trees:
+#                         100       500       1000       2000        5000
+# numpy_loop_p1      0.433521  2.224826   4.315261   9.005083   26.934225
+# numpy_loop_m1      0.476460  2.466126   4.632021  10.354410   25.188171
+# numpy_loop_ray_m1  1.269955  7.207120  16.610913  35.663074  130.514483
+# numpy_loop_ray_p1  1.274609  7.342310  16.560046  35.786295  117.000956
+# =============================================================================
+
+# =============================================================================
+# N=10000         Trees:
+#                      100         500        1000        2000         5000
+# numpy_loop_p1   0.741128    5.429042   27.768768   76.145003   779.551439
+# numpy_loop_m1   0.664058    7.211475   24.288042   84.645377  1585.548253
+# =============================================================================
