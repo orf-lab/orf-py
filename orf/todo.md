@@ -4,13 +4,26 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## To Do:
 
+<<<<<<< HEAD
+=======
+- implement the plotting function (F)
+- implement get_params and set_params function for returning input values (F)
+- implement summary function (F)
+- check the structure of outputs of functions (predict, margin - tuple or dict, check econML and statsmodels) (F)
+>>>>>>> d9d9b544afdb2134c406f9af301221d964044493
 - check how to handle categorical variables (condition integer and number of unique values OR optional array indicating categorical variables by the user, change in R package as well) (G)
 - implement while loop for marginal effects if window too small to yield different x_up and x_down (change in R package as well) (G)
 - decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F)
 - representative test file to compare with R for big data (G)
 - simplify the categorical variable condition in R package to ensure difference of exactly 1 as in Python (G)
+<<<<<<< HEAD
 - add optional argument to compute marginal effects only for certain variables (change in R package as well) (G)
 
+=======
+- check which functions are internal and which are available to the user (_) (F)
+- add optional argument to compute marginal effects only for certain variables (change in R package as well) (G)
+- think about classes vs. subclasses to separate code into smaller files (G,F)
+>>>>>>> d9d9b544afdb2134c406f9af301221d964044493
 - check time comparisons for parallelisation (G)
 - code deadline: 25.3.2022
 - documentation deadline: 1.4.2022
