@@ -6,6 +6,12 @@ Python implementation of the Ordered Forest as in Lechner & Okasa (2019).
 Definitions of class and functions.
 
 """
+# %% Last changes:
+# Set up file according to https://scikit-learn.org/stable/developers/develop.html
+# - use subclasses/inheritance
+# - no operations in __init__ -> instead new function check_inputs
+
+# ToDo: fitted attributes (ending with a trailing underscore)
 
 # %% Packages
 
@@ -16,6 +22,7 @@ import _thread
 import sharedmem
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.base import BaseEstimator
 from econml.grf import RegressionForest
 #import orf.honest_fit as honest_fit
 from joblib import Parallel, delayed, parallel_backend
@@ -27,62 +34,17 @@ from sklearn.utils import check_random_state, check_X_y, check_array
 from sklearn.utils.validation import _num_samples, _num_features, check_is_fitted
 from scipy import stats
 import ray
-# from numba import jit, njit, types, vectorize
+from plotnine import (ggplot, aes, geom_density, facet_wrap, geom_vline, 
+                      ggtitle, xlab, ylab, theme_bw, theme, element_rect)
 
 # %% Class definition
-
-# define OrderedForest class
-class OrderedForest:
+    
+# define OrderedForest class (BaseEstimator allows to call get_params and set_params)
+class BaseOrderedForest(BaseEstimator):
     """
-    Ordered Random Forests class labeled 'OrderedForest'.
-
-    includes methods to fit the model, predict and estimate marginal effects.
-
-    Parameters
-    ----------
-    n_estimators : TYPE: integer
-        DESCRIPTION: Number of trees in the forest. The default is 1000.
-    min_samples_leaf : TYPE: integer
-        DESCRIPTION: Minimum leaf size in the forest. The default is 5.
-    max_features : TYPE: float
-        DESCRIPTION: Share of random covariates (0,1). The default is 0.3.
-    replace : TYPE: bool
-        DESCRIPTION: If True sampling with replacement, i.e. bootstrap is used
-        to grow the trees, otherwise subsampling without replacement is used.
-        The default is False.
-    sample_fraction : TYPE: float
-        DESCRIPTION: Subsampling rate, i.e. the share of samples to draw from
-        X to train each tree. The default is 0.5.
-    honesty : TYPE: bool
-        DESCRIPTION: If True honest forest is built using sample splitting.
-        The default is False.
-    honesty_fraction : TYPE: float
-        DESCRIPTION: Share of observations belonging to honest sample not used
-        for growing the forest. The default is 0.5.
-    inference : TYPE: bool
-        DESCRIPTION: If True the weight based inference is conducted. The
-        default is False.
-    n_jobs : TYPE: int or None
-        DESCRIPTION: The number of parallel jobs to be used for parallelism;
-        follows joblib semantics. n_jobs=-1 means all - 1 available cpu cores.
-        n_jobs=None means no parallelism. There is no parallelism implemented
-        for pred_method='numpy'. The default is -1.
-    pred_method : TYPE str, one of 'cython', 'loop', 'numpy', 'numpy_loop'
-        'numpy_loop_multi', 'numpy_loop_mpire' or 'numpy_sparse'.
-        DESCRIPTION: Which method to use to compute honest predictions. The
-        default is 'numpy_loop_mpire'.
-    weight_method : TYPE str, one of 'numpy_loop', 'numpy_loop_mpire',
-        numpy_loop_multi', numpy_loop_shared_multi or numpy_loop_shared_mpire.
-        DESCRIPTION: Which method to use to compute honest weights. The
-        default is 'numpy_loop_shared_mpire'.
-    random_state : TYPE: int, None or numpy.random.RandomState object
-        DESCRIPTION: Random seed used to initialize the pseudo-random number
-        generator. The default is None. See numpy documentation for details.
-
-
-    Returns
-    -------
-    None. Initializes parameters for Ordered Forest.
+    Base class for forests of trees.
+    Warning: This class should not be used directly. Use derived classes
+    instead.
     """
 
     # define init function
@@ -99,7 +61,36 @@ class OrderedForest:
                  weight_method='numpy_loop_shared_mpire',
                  random_state=None):
 
+        self.n_estimators = n_estimators
+        self.min_samples_leaf = min_samples_leaf
+        self.max_features = max_features
+        self.replace = replace
+        self.sample_fraction = sample_fraction
+        self.honesty = honesty
+        self.honesty_fraction = honesty_fraction
+        self.inference = inference
+        self.n_jobs = n_jobs
+        self.pred_method = pred_method
+        self.weight_method = weight_method
+        self.random_state = random_state
+        # initialize performance metrics
+        self.confusion = None
+        self.measures = None
+        
+    def input_checks(self):
         # check and define the input parameters
+        n_estimators = self.n_estimators
+        min_samples_leaf = self.min_samples_leaf
+        max_features = self.max_features
+        replace = self.replace
+        sample_fraction = self.sample_fraction
+        honesty = self.honesty
+        honesty_fraction = self.honesty_fraction
+        inference = self.inference
+        n_jobs = self.n_jobs
+        pred_method = self.pred_method
+        weight_method = self.weight_method
+        random_state = self.random_state
         # check the number of trees in the forest
         if isinstance(n_estimators, int):
             # check if its at least 1
@@ -293,6 +284,7 @@ class OrderedForest:
         # initialize performance metrics
         self.confusion = None
         self.measures = None
+        
     
     # %% Fit function
     # function to estimate ordered forest
@@ -314,6 +306,7 @@ class OrderedForest:
         -------
         result: ordered probability predictions by Ordered Forest.
         """
+        self.input_checks()
         # Use sklearn input checks to allow for multiple types of inputs:
         # - returns numpy arrays for X and y (no matter which input type)
         # - forces y to be numeric
@@ -972,10 +965,16 @@ class OrderedForest:
         else:
             variance = {}
         # pack estimated forest and class predictions into output dictionary
-        self.forest = {'forests': forests, 'probs': class_probs,
-                       'fitted': fitted, 'outcome_binary_est': outcome_binary_est,
-                       'variance': variance, 'X_fit': X, 'ind_tr': ind_tr,
-                       'ind_est': ind_est, 'weights': weights}
+        self.forest = {'forests': forests,
+                       'probs': class_probs,
+                       'fitted': fitted,
+                       'outcome_binary_est': outcome_binary_est,
+                       'variance': variance,
+                       'X_fit': X,
+                       'y_fit': y,
+                       'ind_tr': ind_tr,
+                       'ind_est': ind_est,
+                       'weights': weights}
         # compute prediction performance
         self.__performance(y, y_values)
         # check if performance metrics should be printed
@@ -984,6 +983,657 @@ class OrderedForest:
 
         # return the output
         return self
+    
+    
+    # %% Performance functions
+    # performance measures (private method, not available to user)
+    def __performance(self, y, y_values):
+        """
+        Evaluate the prediction performance using MSE and CA.
+
+        Parameters
+        ----------
+        y : TYPE: pd.Series
+            DESCRIPTION: vector of outcomes.
+
+        Returns
+        -------
+        None. Calculates MSE, Classification accuracy and confusion matrix.
+        """
+        # take over needed values
+        predictions = self.forest['probs']
+
+        # compute the mse: version 1
+        # create storage empty dataframe
+        mse_matrix = np.zeros(predictions.shape)
+        # allocate indicators for true outcome and leave zeros for the others
+        # minus 1 for the column index as indices start with 0, outcomes with 1
+        mse_matrix[np.arange(y.shape[0]),y-1] = 1
+        # compute mse directly now by substracting two dataframes and rowsums
+        mse_1 = np.mean(((mse_matrix - predictions) ** 2).sum(axis=1))
+
+        # compute the mse: version 2
+        # create storage for modified predictions
+        modified_pred = np.zeros(y.shape[0])
+        # modify the predictions with 1*P(1)+2*P(2)+3*P(3) as an alternative
+        modified_pred = np.dot(predictions, np.arange(
+            start=1, stop=predictions.shape[1]+1))
+        # Compute MSE
+        mse_2 = np.mean((y - modified_pred) ** 2)
+
+        # compute classification accuracy
+        # define classes with highest probability (+1 as index starts with 0)
+        class_pred = predictions.argmax(axis=1) + 1
+        # the accuracy directly now by mean of matching classes
+        acc = np.mean(y == class_pred)
+
+        # create te confusion matrix
+        # First generate onehot matrices of y and class_pred        
+        y_onehot = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1, 1))
+        class_pred_onehot = OneHotEncoder(sparse=False).fit_transform(
+            class_pred.reshape(-1, 1))
+        # Compute dot product of these matrices to obtain confusion matrix
+        confusion_mat = np.dot(np.transpose(y_onehot), class_pred_onehot)
+        labels = ['Class ' + str(c_idx) for c_idx in y_values]
+        self.confusion = pd.DataFrame(confusion_mat, 
+                                      index=labels, columns=labels)
+
+        # wrap the results into a dataframe
+        self.measures = pd.DataFrame({'mse 1': mse_1, 'mse 2': mse_2,
+                                      'accuracy': acc}, index=['value'])
+
+        # empty return
+        return None
+
+    # performance measures (public method, available to user)
+    def performance(self):
+        """
+        Print the prediction performance based on MSE and CA.
+
+        Parameters
+        ----------
+        None.
+
+        Returns
+        -------
+        None. Prints MSE, Classification accuracy and confusion matrix.
+        """
+        # print the result
+        print('Prediction Performance of Ordered Forest', '-' * 80,
+              self.measures, '-' * 80, '\n\n', sep='\n')
+
+        # print the confusion matrix
+        print('Confusion Matrix for Ordered Forest', '-' * 80,
+              '                         Predictions ', '-' * 80,
+              self.confusion, '-' * 80, '\n\n', sep='\n')
+
+        # empty return
+        return None
+
+# Not needed anymore, use sklearn check_X_y instead
+# =============================================================================
+#     # check user input for covariates (private method, not available to user)
+#     def __xcheck(self, X):
+#         """
+#         Check the user input for the pandas dataframe of covariates.
+# 
+#         Parameters
+#         ----------
+#         X : TYPE: pd.DataFrame
+#             DESCRIPTION: matrix of covariates.
+# 
+#         Returns
+#         -------
+#         None. Checks for the correct user input.
+#         """
+#         # check if features X are a pandas dataframe
+#         if isinstance(X, pd.DataFrame):
+#             # check if its non-empty
+#             if X.empty:
+#                 # raise value error
+#                 raise ValueError("X DataFrame is empty. Check the input.")
+#         else:
+#             # raise value error
+#             raise ValueError("X is not a Pandas DataFrame. Recode the input.")
+# 
+#         # empty return
+#         return None
+# =============================================================================
+
+    # %% In-class honesty and weight functions
+    def honest_fit_func(self, tree, forest_apply, outcome_ind_est, max_id):
+        """Compute the honest leaf means using loop."""
+        # create an empty array to save the leaf means
+        leaf_means = np.empty(max_id)
+        # loop over leaf indices
+        for idx in range(0, max_id):
+            # get row numbers of obs with this leaf index
+            row_idx = np.where(forest_apply[:, tree] == idx)
+            # Compute mean of outcome of these obs
+            if row_idx[0].size == 0:
+                leaf_means[idx] = 0
+            else:
+                leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
+        return leaf_means
+
+    def honest_fit_numpy_func(self, tree, forest_apply, outcome_ind_est,
+                              max_id):
+        """Compute the honest leaf means using numpy."""
+        # create an empty array to save the leaf means
+        leaf_means = np.zeros(max_id)
+        # Create dummy matrix dim(n_est, max_id)
+        onehot = OneHotEncoder(sparse=True).fit_transform(
+            forest_apply[:, tree].reshape(-1, 1))
+        # Compute leaf sums for each leaf
+        leaf_sums = onehot.T.dot(outcome_ind_est)
+        # Determine number of observations per leaf
+        leaf_n = onehot.sum(axis=0)
+        # Compute leaf means for each leaf
+        leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+        return leaf_means
+
+    def honest_weight_numpy(self, tree, forest_apply, forest_apply_all,
+                            n_samples, n_est):
+        """Compute the honest weights using numpy."""
+        # extract vectors of leaf IDs
+        leaf_IDs_honest = forest_apply[:, tree]
+        leaf_IDs_all = forest_apply_all[:, tree]
+        # Take care of cases where not all train leafs
+        # populated by observations from honest sample
+        leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+        leaf_IDs_all_u = np.unique(leaf_IDs_all)
+        if np.array_equal(leaf_IDs_honest_u, 
+                          leaf_IDs_all_u):
+            leaf_IDs_honest_ext = leaf_IDs_honest
+            leaf_IDs_all_ext = leaf_IDs_all
+        else:
+            # Find leaf IDs in all that are not in honest
+            extra_honest = np.setdiff1d(
+                leaf_IDs_all_u, leaf_IDs_honest_u)
+            leaf_IDs_honest_ext = np.append(
+                leaf_IDs_honest, extra_honest)
+            # Find leaf IDs in honest that are not in all
+            extra_all = np.setdiff1d(
+                leaf_IDs_honest_u, leaf_IDs_all_u)
+            leaf_IDs_all_ext = np.append(
+                leaf_IDs_all, extra_all)
+        # Generate onehot matrices
+        onehot_honest = OneHotEncoder(
+            sparse=True).fit_transform(
+                leaf_IDs_honest_ext.reshape(-1, 1)).T
+        onehot_all = OneHotEncoder(
+            sparse=True).fit_transform(
+                leaf_IDs_all_ext.reshape(-1, 1))
+        onehot_all = onehot_all[:n_samples,:]
+        # Multiply matrices
+        # (n, n_leafs)x(n_leafs, n_est)
+        tree_out = onehot_all.dot(onehot_honest).todense()
+        # Get leaf sizes
+        # leaf size only for honest sample !!!
+        leaf_size = tree_out.sum(axis=1)
+        # Delete extra observations for unpopulated
+        # honest leaves
+        if not np.array_equal(
+                leaf_IDs_honest_u, leaf_IDs_all_u):
+            tree_out = tree_out[:n_samples, :n_est]
+        # Compute weights
+        tree_out = tree_out/leaf_size
+        return tree_out
+
+
+
+    
+
+
+
+
+# =============================================================================
+#     def honest_weight_numpy(self, n_tree, forest_out, forest_apply, forest_apply_all,
+#                             n_samples, n_est):
+#         """Compute the honest weights using numpy."""
+#         # generate storage matrix for weights
+#         forest_out = np.zeros((n_samples, n_est))
+#         # Loop over trees
+#         for tree in range(n_tree):
+#             # extract vectors of leaf IDs
+#             leaf_IDs_honest = forest_apply[:, tree]
+#             leaf_IDs_all = forest_apply_all[:, tree]
+#             # Take care of cases where not all training leafs
+#             # populated by observations from honest sample
+#             leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+#             leaf_IDs_all_u = np.unique(leaf_IDs_all)
+#             if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
+#                 leaf_IDs_honest_ext = leaf_IDs_honest
+#             else:
+#                 extra = np.setxor1d(leaf_IDs_all_u,
+#                                     leaf_IDs_honest_u)
+#                 leaf_IDs_honest_ext = np.append(
+#                     leaf_IDs_honest, extra)
+#             # Generate onehot matrices
+#             onehot_honest = OneHotEncoder(
+#                 sparse=True).fit_transform(
+#                     leaf_IDs_honest_ext.reshape(-1, 1)).T
+#             onehot_all = OneHotEncoder(
+#                 sparse=True).fit_transform(
+#                     leaf_IDs_all.reshape(-1, 1))
+#             # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
+#             tree_out = onehot_all.dot(onehot_honest).todense()
+#             # Get leaf sizes
+#             # leaf size only for honest sample !!!
+#             leaf_size = tree_out.sum(axis=1)
+#             # Delete extra observations for unpopulated honest
+#             # leaves
+#             if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
+#                 tree_out = tree_out[:n_samples, :n_est]
+#             # Compute weights
+#             tree_out = tree_out/leaf_size
+#             # add tree weights to overall forest weights
+#             forest_out = forest_out + tree_out
+#             return forest_out
+# =============================================================================
+
+
+    # Function to compute variance of predictions.
+    # -> Does the N in the formula refer to n_samples or to n_est?
+    def honest_variance(self, probs, weights, outcome_binary, nclass, n_est):
+        """Compute the variance of predictions (out-of-sample)."""
+        # ### (single class) Variance computation:
+        # Create storage containers
+        honest_multi_demeaned = {}
+        honest_variance = {}
+        # Loop over classes
+        for class_idx in range(1, nclass, 1):
+            # divide predictions by N to obtain mean after summing up
+            honest_pred_mean = np.reshape(
+                probs[:, (class_idx-1)] / n_est, (-1, 1))
+            # calculate standard multiplication of weights and outcomes
+            honest_multi = np.multiply(
+                weights[class_idx], outcome_binary[class_idx].reshape((1, -1)))
+            # subtract the mean from each obs i
+            honest_multi_demeaned[class_idx] = honest_multi - honest_pred_mean
+            # compute the square
+            honest_multi_demeaned_sq = np.square(
+                honest_multi_demeaned[class_idx])
+            # sum over all i in honest sample
+            honest_multi_demeaned_sq_sum = np.sum(
+                honest_multi_demeaned_sq, axis=1)
+            # multiply by N/N-1 (normalize)
+            honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
+                                          (n_est/(n_est-1)))
+        # ### Covariance computation:
+        # Shift categories for computational convenience
+        # Postpend matrix of zeros
+        honest_multi_demeaned_0_last = honest_multi_demeaned
+        honest_multi_demeaned_0_last[nclass] = np.zeros(
+            honest_multi_demeaned_0_last[1].shape)
+        # Prepend matrix of zeros
+        honest_multi_demeaned_0_first = {}
+        honest_multi_demeaned_0_first[1] = np.zeros(
+            honest_multi_demeaned[1].shape)
+        # Shift existing matrices by 1 class
+        for class_idx in range(1, nclass, 1):
+            honest_multi_demeaned_0_first[
+                class_idx+1] = honest_multi_demeaned[class_idx]
+        # Create storage container
+        honest_covariance = {}
+        # Loop over classes
+        for class_idx in range(1, nclass+1, 1):
+            # multiplication of category m with m-1
+            honest_multi_demeaned_cov = np.multiply(
+                honest_multi_demeaned_0_first[class_idx],
+                honest_multi_demeaned_0_last[class_idx])
+            # sum all obs i in honest sample
+            honest_multi_demeaned_cov_sum = np.sum(
+                honest_multi_demeaned_cov, axis=1)
+            # multiply by (N/N-1)*2
+            honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
+                n_est/(n_est-1))
+        # ### Put everything together
+        # Shift categories for computational convenience
+        # Postpend matrix of zeros
+        honest_variance_last = honest_variance
+        honest_variance_last[nclass] = np.zeros(honest_variance_last[1].shape)
+        # Prepend matrix of zeros
+        honest_variance_first = {}
+        honest_variance_first[1] = np.zeros(honest_variance[1].shape)
+        # Shift existing matrices by 1 class
+        for class_idx in range(1, nclass, 1):
+            honest_variance_first[class_idx+1] = honest_variance[class_idx]
+        # Create storage container
+        honest_variance_final = np.empty((probs.shape[0], nclass))
+        # Compute final variance according to: var_last + var_first - cov
+        for class_idx in range(1, nclass+1, 1):
+            honest_variance_final[
+                :, (class_idx-1):class_idx] = honest_variance_last[
+                    class_idx].reshape(-1, 1) + honest_variance_first[
+                    class_idx].reshape(-1, 1) - honest_covariance[
+                        class_idx].reshape(-1, 1)
+        return honest_variance_final
+
+    # Function to compute variance of predictions.
+    # -> Does the N in the formula refer to n_samples or to n_est?
+    # -> This depends on which data is passed to the function:
+    # for train sample N=n_tr and for honest sample N=n_est
+    def get_honest_variance(self, probs, weights, outcome_binary, nclass,
+                            ind_tr, ind_est):
+        """Compute the variance of predictions (in-sample)."""
+        # get the number of observations in train and honest sample
+        n_est = len(ind_est)
+        n_tr = len(ind_tr)
+        # ### (single class) Variance computation:
+        # ## Create storage containers
+        # honest sample
+        honest_multi_demeaned = {}
+        honest_variance = {}
+        # train sample
+        train_multi_demeaned = {}
+        train_variance = {}
+        # Loop over classes
+        for class_idx in range(1, nclass, 1):
+            # divide predictions by N to obtain mean after summing up
+            # honest sample
+            honest_pred_mean = np.reshape(
+                probs[ind_est, (class_idx-1)] / n_est, (-1, 1))
+            # train sample
+            train_pred_mean = np.reshape(
+                probs[ind_tr, (class_idx-1)] / n_tr, (-1, 1))
+            # calculate standard multiplication of weights and outcomes
+            # outcomes need to be from the honest sample (outcome_binary_est)
+            # for both honest and train multi
+            # honest sample
+            honest_multi = np.multiply(
+                weights[class_idx][ind_est, :],
+                outcome_binary[class_idx].reshape((1, -1)))
+            # train sample
+            train_multi = np.multiply(
+                weights[class_idx][ind_tr, :],
+                outcome_binary[class_idx].reshape((1, -1)))
+            # subtract the mean from each obs i
+            # honest sample
+            honest_multi_demeaned[class_idx] = honest_multi - honest_pred_mean
+            # train sample
+            train_multi_demeaned[class_idx] = train_multi - train_pred_mean
+            # compute the square
+            # honest sample
+            honest_multi_demeaned_sq = np.square(
+                honest_multi_demeaned[class_idx])
+            # train sample
+            train_multi_demeaned_sq = np.square(
+                train_multi_demeaned[class_idx])
+            # sum over all i in the corresponding sample
+            # honest sample
+            honest_multi_demeaned_sq_sum = np.sum(
+                honest_multi_demeaned_sq, axis=1)
+            # train sample
+            train_multi_demeaned_sq_sum = np.sum(
+                train_multi_demeaned_sq, axis=1)
+            # multiply by N/N-1 (normalize), N for the corresponding sample
+            # honest sample
+            honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
+                                          (n_est/(n_est-1)))
+            # train sample
+            train_variance[class_idx] = (train_multi_demeaned_sq_sum *
+                                         (n_tr/(n_tr-1)))
+
+        # ### Covariance computation:
+        # Shift categories for computational convenience
+        # Postpend matrix of zeros
+        # honest sample
+        honest_multi_demeaned_0_last = honest_multi_demeaned
+        honest_multi_demeaned_0_last[nclass] = np.zeros(
+            honest_multi_demeaned_0_last[1].shape)
+        # train sample
+        train_multi_demeaned_0_last = train_multi_demeaned
+        train_multi_demeaned_0_last[nclass] = np.zeros(
+            train_multi_demeaned_0_last[1].shape)
+        # Prepend matrix of zeros
+        # honest sample
+        honest_multi_demeaned_0_first = {}
+        honest_multi_demeaned_0_first[1] = np.zeros(
+            honest_multi_demeaned[1].shape)
+        # train sample
+        train_multi_demeaned_0_first = {}
+        train_multi_demeaned_0_first[1] = np.zeros(
+            train_multi_demeaned[1].shape)
+        # Shift existing matrices by 1 class
+        # honest sample
+        for class_idx in range(1, nclass, 1):
+            honest_multi_demeaned_0_first[
+                class_idx+1] = honest_multi_demeaned[class_idx]
+        # train sample
+        for class_idx in range(1, nclass, 1):
+            train_multi_demeaned_0_first[
+                class_idx+1] = train_multi_demeaned[class_idx]
+        # Create storage container
+        honest_covariance = {}
+        train_covariance = {}
+        # Loop over classes
+        for class_idx in range(1, nclass+1, 1):
+            # multiplication of category m with m-1
+            # honest sample
+            honest_multi_demeaned_cov = np.multiply(
+                honest_multi_demeaned_0_first[class_idx],
+                honest_multi_demeaned_0_last[class_idx])
+            # train sample
+            train_multi_demeaned_cov = np.multiply(
+                train_multi_demeaned_0_first[class_idx],
+                train_multi_demeaned_0_last[class_idx])
+            # sum all obs i in honest sample
+            honest_multi_demeaned_cov_sum = np.sum(
+                honest_multi_demeaned_cov, axis=1)
+            # sum all obs i in train sample
+            train_multi_demeaned_cov_sum = np.sum(
+                train_multi_demeaned_cov, axis=1)
+            # multiply by (N/N-1)*2
+            # honest sample
+            honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
+                n_est/(n_est-1))
+            # train sample
+            train_covariance[class_idx] = train_multi_demeaned_cov_sum*2*(
+                n_tr/(n_tr-1))
+
+        # ### Put everything together
+        # Shift categories for computational convenience
+        # Postpend matrix of zeros
+        # honest sample
+        honest_variance_last = honest_variance
+        honest_variance_last[nclass] = np.zeros(honest_variance_last[1].shape)
+        # train sample
+        train_variance_last = train_variance
+        train_variance_last[nclass] = np.zeros(train_variance_last[1].shape)
+        # Prepend matrix of zeros
+        # honest sample
+        honest_variance_first = {}
+        honest_variance_first[1] = np.zeros(honest_variance[1].shape)
+        # train sample
+        train_variance_first = {}
+        train_variance_first[1] = np.zeros(train_variance[1].shape)
+        # Shift existing matrices by 1 class
+        for class_idx in range(1, nclass, 1):
+            # honest sample
+            honest_variance_first[class_idx+1] = honest_variance[class_idx]
+            # train sample
+            train_variance_first[class_idx+1] = train_variance[class_idx]
+        # Create storage container
+        honest_variance_final = np.empty((n_est, nclass))
+        train_variance_final = np.empty((n_tr, nclass))
+        # Compute final variance according to: var_last + var_first - cov
+        for class_idx in range(1, nclass+1, 1):
+            # honest sample
+            honest_variance_final[
+                :, (class_idx-1):class_idx] = honest_variance_last[
+                    class_idx].reshape(-1, 1) + honest_variance_first[
+                    class_idx].reshape(-1, 1) - honest_covariance[
+                        class_idx].reshape(-1, 1)
+            # train sample
+            train_variance_final[
+                :, (class_idx-1):class_idx] = train_variance_last[
+                    class_idx].reshape(-1, 1) + train_variance_first[
+                    class_idx].reshape(-1, 1) - train_covariance[
+                        class_idx].reshape(-1, 1)
+        # put honest and train sample together
+        variance_final = np.vstack((honest_variance_final,
+                                    train_variance_final))
+        # Combine indices
+        ind_all = np.hstack((ind_est, ind_tr))
+        # Sort variance_final according to indices in ind_all
+        variance_final = variance_final[ind_all.argsort(), :]
+        # retunr final variance
+        return variance_final
+
+# %% Out-of-class honesty and weight functions (for parallelization)
+# define function outside of the class for speedup of multiprocessing
+def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
+    """Compute the honest leaf means using loop."""
+    # create an empty array to save the leaf means
+    leaf_means = np.empty(max_id)
+    # loop over leaf indices
+    for idx in range(0, max_id):
+        # get row numbers of obs with this leaf index
+        row_idx = np.where(forest_apply[:, tree] == idx)
+        # Compute mean of outcome of these obs
+        if row_idx[0].size == 0:
+            leaf_means[idx] = 0
+        else:
+            leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
+    return leaf_means
+
+@ray.remote
+def honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
+    """Compute the honest leaf means using numpy."""
+    # create an empty array to save the leaf means
+    leaf_means = np.zeros(max_id)
+    # Create dummy matrix dim(n_est, max_id)
+    onehot = OneHotEncoder(sparse=True).fit_transform(
+        forest_apply[:, tree].reshape(-1, 1))
+    # Compute leaf sums for each leaf
+    leaf_sums = onehot.T.dot(outcome_ind_est)
+    # Determine number of observations per leaf
+    leaf_n = onehot.sum(axis=0)
+    # Compute leaf means for each leaf
+    leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+    return leaf_means
+
+
+def honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
+                            n_est):
+    """Compute the honest weights using numpy."""
+    # extract vectors of leaf IDs
+    leaf_IDs_honest = forest_apply[:, tree]
+    leaf_IDs_all = forest_apply_all[:, tree]
+    # Take care of cases where not all train leafs
+    # populated by observations from honest sample
+    leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
+    leaf_IDs_all_u = np.unique(leaf_IDs_all)
+    if np.array_equal(leaf_IDs_honest_u, 
+                      leaf_IDs_all_u):
+        leaf_IDs_honest_ext = leaf_IDs_honest
+        leaf_IDs_all_ext = leaf_IDs_all
+    else:
+        # Find leaf IDs in all that are not in honest
+        extra_honest = np.setdiff1d(
+            leaf_IDs_all_u, leaf_IDs_honest_u)
+        leaf_IDs_honest_ext = np.append(
+            leaf_IDs_honest, extra_honest)
+        # Find leaf IDs in honest that are not in all
+        extra_all = np.setdiff1d(
+            leaf_IDs_honest_u, leaf_IDs_all_u)
+        leaf_IDs_all_ext = np.append(
+            leaf_IDs_all, extra_all)
+    # Generate onehot matrices
+    onehot_honest = OneHotEncoder(
+        sparse=True).fit_transform(
+            leaf_IDs_honest_ext.reshape(-1, 1)).T
+    onehot_all = OneHotEncoder(
+        sparse=True).fit_transform(
+            leaf_IDs_all_ext.reshape(-1, 1))
+    onehot_all = onehot_all[:n_samples,:]
+    # Multiply matrices
+    # (n, n_leafs)x(n_leafs, n_est)
+    tree_out = onehot_all.dot(onehot_honest).todense()
+    # Get leaf sizes
+    # leaf size only for honest sample !!!
+    leaf_size = tree_out.sum(axis=1)
+    # Delete extra observations for unpopulated
+    # honest leaves
+    if not np.array_equal(
+            leaf_IDs_honest_u, leaf_IDs_all_u):
+        tree_out = tree_out[:n_samples, :n_est]
+    # Compute weights
+    tree_out = tree_out/leaf_size
+    return tree_out
+
+
+# multiprocessing with shared memory
+_lock = Lock()  # initiate lock
+
+
+# define tree weight function in shared memory
+def tree_weights(_shared_buffer, tree, forest_apply, forest_apply_all,
+                 n_samples, n_est):
+    # get the tree weights
+    tree_out = honest_weight_numpy_out(tree, forest_apply, forest_apply_all,
+                                       n_samples, n_est)
+    _lock.acquire()
+    _shared_buffer += tree_out  # update the buffer with tree weights
+    _lock.release()
+
+
+# define forest weights function in shared memory using multiprocessing
+def forest_weights_multi(partial_fun, n_samples, n_est, n_jobs, n_estimators):
+    # initiate output in shared memory
+    forest_out = sharedmem.empty((n_samples, n_est), dtype=np.float64)
+    pool = Pool(n_jobs)  # start the multiprocessing pool
+    pool.starmap(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
+    pool.close()  # close parallel
+    pool.join()  # join parallel
+    return forest_out
+
+
+# # define forest weights function in shared memory using mpire (faster)
+def forest_weights_mpire(partial_fun, n_samples, n_est, n_jobs, n_estimators):
+    # initiate output in shared memory
+    forest_out = sharedmem.empty((n_samples, n_est), dtype=np.float64)
+    pool = WorkerPool(n_jobs)  # start the mpire pool
+    pool.map(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
+    pool.stop_and_join()  # stop and join pool
+    return forest_out
+
+
+class OrderedForest(BaseOrderedForest):
+    """
+    Base class for forests of trees.
+    Warning: This class should not be used directly. Use derived classes
+    instead.
+    """
+    # define init function
+    def __init__(self, n_estimators=1000,
+                 min_samples_leaf=5,
+                 max_features=0.3,
+                 replace=True,
+                 sample_fraction=0.5,
+                 honesty=False,
+                 honesty_fraction=0.5,
+                 inference=False,
+                 n_jobs=-1,
+                 pred_method='numpy_loop_mpire',
+                 weight_method='numpy_loop_shared_mpire',
+                 random_state=None):
+        # access inherited methods
+        super().__init__(
+            n_estimators=n_estimators,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            replace=replace,
+            sample_fraction=sample_fraction,
+            honesty=honesty,
+            honesty_fraction=honesty_fraction,
+            inference=inference,
+            n_jobs=n_jobs,
+            pred_method=pred_method,
+            weight_method=weight_method,
+            random_state=random_state
+        )
     
     # %% Predict function
     # function to predict with estimated ordered forest
@@ -1055,7 +1705,7 @@ class OrderedForest:
                   '-' * 70, sep='\n')
 
         # Initialize final variance output
-        var_final = {}
+        var_final = None
         # Initialize storage dictionary for weights
         weights = {}
         
@@ -1118,12 +1768,16 @@ class OrderedForest:
                     n_est=len(self.forest['ind_est']))
 
         # return the class predictions
-        if not var_final is {}:
-            result = (pred_final, var_final)
-        else:
-            result = (pred_final, None)
+        result = {'output': 'predict',
+                  'prob': prob,
+                  'predictions': pred_final,
+                  'variances': var_final}
         return result
-
+    
+    
+    
+    
+    
     # %% Margin function
     # function to evaluate marginal effects with estimated ordered forest
     def margin(self, X, eval_point="mean", window=0.1, verbose=True):
@@ -1517,7 +2171,9 @@ class OrderedForest:
             t_values = None
             p_values = None
         # put everything into a list of results
-        results = {'eval_point': eval_point,
+        results = {'output': 'margin',
+                   'eval_point': eval_point,
+                   'window': h_std,
                    'effects': margins,
                    'variances': variance_me,
                    'std_errors': sd_me,
@@ -1529,273 +2185,27 @@ class OrderedForest:
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
             # print marginal effects nicely
             if not inference:
-                print('Marginal Effects of Ordered Forest, evaluation point: '+ 
-                      eval_point, '-' * 80, 'Effects:', '-' * 80,
+                print('-' * 70,
+                      'Marginal Effects of Ordered Forest, evaluation point: '+ 
+                      eval_point, '-' * 70, 'Effects:', '-' * 70,
                       pd.DataFrame(data=margins, 
                                    index=['X' + sub for sub in string_seq_X], 
                                    columns=['Cat' + sub for sub in string_seq_cat]),
-                      '-' * 80, '\n\n', sep='\n')
+                      '-' * 70, sep='\n')
             else:
-                print('Marginal Effects of Ordered Forest, evaluation point: '+ 
-                      eval_point, '-' * 80, 'Effects:', '-' * 80,
+                print('-' * 70,
+                      'Marginal Effects of Ordered Forest, evaluation point: '+ 
+                      eval_point, '-' * 70, 'Effects:', '-' * 70,
                       pd.DataFrame(data=margins, 
                                    index=['X' + sub for sub in string_seq_X], 
                                    columns=['Cat' + sub for sub in string_seq_cat]),
-                      '-' * 80,'Standard errors:', '-' * 80,
+                      '-' * 70,'Standard errors:', '-' * 70,
                       pd.DataFrame(data=sd_me, 
                                    index=['X' + sub for sub in string_seq_X], 
                                    columns=['Cat' + sub for sub in string_seq_cat]),
-                      '-' * 80, '\n\n', sep='\n')
+                      '-' * 70, sep='\n')
         return results
-
-
-    # %% Performance functions
-    # performance measures (private method, not available to user)
-    def __performance(self, y, y_values):
-        """
-        Evaluate the prediction performance using MSE and CA.
-
-        Parameters
-        ----------
-        y : TYPE: pd.Series
-            DESCRIPTION: vector of outcomes.
-
-        Returns
-        -------
-        None. Calculates MSE, Classification accuracy and confusion matrix.
-        """
-        # take over needed values
-        predictions = self.forest['probs']
-
-        # compute the mse: version 1
-        # create storage empty dataframe
-        mse_matrix = np.zeros(predictions.shape)
-        # allocate indicators for true outcome and leave zeros for the others
-        # minus 1 for the column index as indices start with 0, outcomes with 1
-        mse_matrix[np.arange(y.shape[0]),y-1] = 1
-        # compute mse directly now by substracting two dataframes and rowsums
-        mse_1 = np.mean(((mse_matrix - predictions) ** 2).sum(axis=1))
-
-        # compute the mse: version 2
-        # create storage for modified predictions
-        modified_pred = np.zeros(y.shape[0])
-        # modify the predictions with 1*P(1)+2*P(2)+3*P(3) as an alternative
-        modified_pred = np.dot(predictions, np.arange(
-            start=1, stop=predictions.shape[1]+1))
-        # Compute MSE
-        mse_2 = np.mean((y - modified_pred) ** 2)
-
-        # compute classification accuracy
-        # define classes with highest probability (+1 as index starts with 0)
-        class_pred = predictions.argmax(axis=1) + 1
-        # the accuracy directly now by mean of matching classes
-        acc = np.mean(y == class_pred)
-
-        # create te confusion matrix
-        # First generate onehot matrices of y and class_pred        
-        y_onehot = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1, 1))
-        class_pred_onehot = OneHotEncoder(sparse=False).fit_transform(
-            class_pred.reshape(-1, 1))
-        # Compute dot product of these matrices to obtain confusion matrix
-        confusion_mat = np.dot(np.transpose(y_onehot), class_pred_onehot)
-        labels = ['Class ' + str(c_idx) for c_idx in y_values]
-        self.confusion = pd.DataFrame(confusion_mat, 
-                                      index=labels, columns=labels)
-
-        # wrap the results into a dataframe
-        self.measures = pd.DataFrame({'mse 1': mse_1, 'mse 2': mse_2,
-                                      'accuracy': acc}, index=['value'])
-
-        # empty return
-        return None
-
-    # performance measures (public method, available to user)
-    def performance(self):
-        """
-        Print the prediction performance based on MSE and CA.
-
-        Parameters
-        ----------
-        None.
-
-        Returns
-        -------
-        None. Prints MSE, Classification accuracy and confusion matrix.
-        """
-        # print the result
-        print('Prediction Performance of Ordered Forest', '-' * 80,
-              self.measures, '-' * 80, '\n\n', sep='\n')
-
-        # print the confusion matrix
-        print('Confusion Matrix for Ordered Forest', '-' * 80,
-              '                         Predictions ', '-' * 80,
-              self.confusion, '-' * 80, '\n\n', sep='\n')
-
-        # empty return
-        return None
-
-# Not needed anymore, use sklearn check_X_y instead
-# =============================================================================
-#     # check user input for covariates (private method, not available to user)
-#     def __xcheck(self, X):
-#         """
-#         Check the user input for the pandas dataframe of covariates.
-# 
-#         Parameters
-#         ----------
-#         X : TYPE: pd.DataFrame
-#             DESCRIPTION: matrix of covariates.
-# 
-#         Returns
-#         -------
-#         None. Checks for the correct user input.
-#         """
-#         # check if features X are a pandas dataframe
-#         if isinstance(X, pd.DataFrame):
-#             # check if its non-empty
-#             if X.empty:
-#                 # raise value error
-#                 raise ValueError("X DataFrame is empty. Check the input.")
-#         else:
-#             # raise value error
-#             raise ValueError("X is not a Pandas DataFrame. Recode the input.")
-# 
-#         # empty return
-#         return None
-# =============================================================================
-
-    # %% In-class honesty and weight functions
-    def honest_fit_func(self, tree, forest_apply, outcome_ind_est, max_id):
-        """Compute the honest leaf means using loop."""
-        # create an empty array to save the leaf means
-        leaf_means = np.empty(max_id)
-        # loop over leaf indices
-        for idx in range(0, max_id):
-            # get row numbers of obs with this leaf index
-            row_idx = np.where(forest_apply[:, tree] == idx)
-            # Compute mean of outcome of these obs
-            if row_idx[0].size == 0:
-                leaf_means[idx] = 0
-            else:
-                leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
-        return leaf_means
-
-    def honest_fit_numpy_func(self, tree, forest_apply, outcome_ind_est,
-                              max_id):
-        """Compute the honest leaf means using numpy."""
-        # create an empty array to save the leaf means
-        leaf_means = np.zeros(max_id)
-        # Create dummy matrix dim(n_est, max_id)
-        onehot = OneHotEncoder(sparse=True).fit_transform(
-            forest_apply[:, tree].reshape(-1, 1))
-        # Compute leaf sums for each leaf
-        leaf_sums = onehot.T.dot(outcome_ind_est)
-        # Determine number of observations per leaf
-        leaf_n = onehot.sum(axis=0)
-        # Compute leaf means for each leaf
-        leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
-        return leaf_means
-
-    def honest_weight_numpy(self, tree, forest_apply, forest_apply_all,
-                            n_samples, n_est):
-        """Compute the honest weights using numpy."""
-        # extract vectors of leaf IDs
-        leaf_IDs_honest = forest_apply[:, tree]
-        leaf_IDs_all = forest_apply_all[:, tree]
-        # Take care of cases where not all train leafs
-        # populated by observations from honest sample
-        leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-        leaf_IDs_all_u = np.unique(leaf_IDs_all)
-        if np.array_equal(leaf_IDs_honest_u, 
-                          leaf_IDs_all_u):
-            leaf_IDs_honest_ext = leaf_IDs_honest
-            leaf_IDs_all_ext = leaf_IDs_all
-        else:
-            # Find leaf IDs in all that are not in honest
-            extra_honest = np.setdiff1d(
-                leaf_IDs_all_u, leaf_IDs_honest_u)
-            leaf_IDs_honest_ext = np.append(
-                leaf_IDs_honest, extra_honest)
-            # Find leaf IDs in honest that are not in all
-            extra_all = np.setdiff1d(
-                leaf_IDs_honest_u, leaf_IDs_all_u)
-            leaf_IDs_all_ext = np.append(
-                leaf_IDs_all, extra_all)
-        # Generate onehot matrices
-        onehot_honest = OneHotEncoder(
-            sparse=True).fit_transform(
-                leaf_IDs_honest_ext.reshape(-1, 1)).T
-        onehot_all = OneHotEncoder(
-            sparse=True).fit_transform(
-                leaf_IDs_all_ext.reshape(-1, 1))
-        onehot_all = onehot_all[:n_samples,:]
-        # Multiply matrices
-        # (n, n_leafs)x(n_leafs, n_est)
-        tree_out = onehot_all.dot(onehot_honest).todense()
-        # Get leaf sizes
-        # leaf size only for honest sample !!!
-        leaf_size = tree_out.sum(axis=1)
-        # Delete extra observations for unpopulated
-        # honest leaves
-        if not np.array_equal(
-                leaf_IDs_honest_u, leaf_IDs_all_u):
-            tree_out = tree_out[:n_samples, :n_est]
-        # Compute weights
-        tree_out = tree_out/leaf_size
-        return tree_out
-
-
-
     
-
-
-
-
-# =============================================================================
-#     def honest_weight_numpy(self, n_tree, forest_out, forest_apply, forest_apply_all,
-#                             n_samples, n_est):
-#         """Compute the honest weights using numpy."""
-#         # generate storage matrix for weights
-#         forest_out = np.zeros((n_samples, n_est))
-#         # Loop over trees
-#         for tree in range(n_tree):
-#             # extract vectors of leaf IDs
-#             leaf_IDs_honest = forest_apply[:, tree]
-#             leaf_IDs_all = forest_apply_all[:, tree]
-#             # Take care of cases where not all training leafs
-#             # populated by observations from honest sample
-#             leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-#             leaf_IDs_all_u = np.unique(leaf_IDs_all)
-#             if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
-#                 leaf_IDs_honest_ext = leaf_IDs_honest
-#             else:
-#                 extra = np.setxor1d(leaf_IDs_all_u,
-#                                     leaf_IDs_honest_u)
-#                 leaf_IDs_honest_ext = np.append(
-#                     leaf_IDs_honest, extra)
-#             # Generate onehot matrices
-#             onehot_honest = OneHotEncoder(
-#                 sparse=True).fit_transform(
-#                     leaf_IDs_honest_ext.reshape(-1, 1)).T
-#             onehot_all = OneHotEncoder(
-#                 sparse=True).fit_transform(
-#                     leaf_IDs_all.reshape(-1, 1))
-#             # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
-#             tree_out = onehot_all.dot(onehot_honest).todense()
-#             # Get leaf sizes
-#             # leaf size only for honest sample !!!
-#             leaf_size = tree_out.sum(axis=1)
-#             # Delete extra observations for unpopulated honest
-#             # leaves
-#             if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
-#                 tree_out = tree_out[:n_samples, :n_est]
-#             # Compute weights
-#             tree_out = tree_out/leaf_size
-#             # add tree weights to overall forest weights
-#             forest_out = forest_out + tree_out
-#             return forest_out
-# =============================================================================
-
     #Function to predict via sklearn
     def predict_default(self, X, n_samples):
         # create an empty array to save the predictions
@@ -1873,372 +2283,248 @@ class OrderedForest:
 # End of numpy_loop
 # =============================================================================
         return probs, weights
+    
+    def summary(self, item=None):
+        """
+        Print forest information and prediction performance.
+
+        Parameters
+        ----------
+        None.
+
+        Returns
+        -------
+        None.
+        """
+        # Input checks
+        # check if input has been fitted (sklearn function)
+        check_is_fitted(self, attributes=["forest"])
+        # Check if outout item properly (sklearn function)
+        if item is not None:
+            if not (item['output']=='predict'
+                    or item['output']=='margin'):
+                # raise value error
+                raise ValueError("item needs to be prediction or margin "
+                                 "output or Nonetype")
+        if item is None:
+            # print the result
+            print('-' * 50,'Summary of the OrderedRandomForest estimation', 
+                  '-' * 50, 
+                  sep='\n')
+            print('%-18s%-15s' % ('type:', 'OrderedForestRegressor'))
+            print('%-18s%-15s' % ('categories:', self.n_class))
+            print('%-18s%-15s' % ('build:', 'Subsampling' if not
+                                  self.replace else 'Bootstrap'))
+            print('%-18s%-15s' % ('n_estimators:', self.n_estimators))
+            print('%-18s%-15s' % ('max_features:', self.max_features))
+            print('%-18s%-15s' % ('min_samples_leaf:', self.min_samples_leaf))
+            print('%-18s%-15s' % ('replace:', self.replace))
+            print('%-18s%-15s' % ('sample_fraction:', self.sample_fraction))
+            print('%-18s%-15s' % ('honesty:', self.honesty))
+            print('%-18s%-15s' % ('honesty_fraction:', self.honesty_fraction))
+            print('%-18s%-15s' % ('inference:', self.inference))
+            print('%-18s%-15s' % ('trainsize:', len(self.forest['ind_tr'])))
+            print('%-18s%-15s' % ('honestsize:', len(self.forest['ind_est'])))
+            print('%-18s%-15s' % ('features:', self.n_features))
+            print('%-18s%-15s' % ('mse1:',np.round(
+                float(self.measures['mse 1']),3)))
+            print('%-18s%-15s' % ('mse2:',np.round(
+                float(self.measures['mse 2']),3)))
+            print('%-18s%-15s' % ('accuracy:',np.round(
+                float(self.measures['accuracy']),3)))
+            print('-' * 50)
+        
+        elif item['output']=='predict':
+            print('-' * 60, 'Summary of the OrderedRandomForest predictions', '-' * 60, 
+                  sep='\n')
+            print('%-18s%-15s' % ('type:', 
+                                  'OrderedForestRegressor predictions'))
+            print('%-18s%-15s' % ('prediction_type:', 'Probability' if 
+                                  item['prob'] else 'Class'))
+            print('%-18s%-15s' % ('categories:', self.n_class))
+            print('%-18s%-15s' % ('build:', 'Subsampling' if not
+                                  self.replace else 'Bootstrap'))
+            print('%-18s%-15s' % ('n_estimators:', self.n_estimators))
+            print('%-18s%-15s' % ('max_features:', self.max_features))
+            print('%-18s%-15s' % ('min_samples_leaf:', self.min_samples_leaf))
+            print('%-18s%-15s' % ('replace:', self.replace))
+            print('%-18s%-15s' % ('sample_fraction:', self.sample_fraction))
+            print('%-18s%-15s' % ('honesty:', self.honesty))
+            print('%-18s%-15s' % ('honesty_fraction:', self.honesty_fraction))
+            print('%-18s%-15s' % ('inference:', self.inference))
+            print('%-18s%-15s' % ('sample_size:', np.shape(
+                item['predictions'])[0]))
+            print('-' * 60)
+        
+        elif item['output']=='margin':
+            string_seq_X = [str(x) for x in np.arange(1,self.n_features+1)]
+            string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
+            print('-' * 60, 
+                  'Summary of the OrderedRandomForest marginal effects',
+                  '-' * 60, sep='\n')
+            print('%-18s%-15s' % ('type:', 
+                                  'OrderedForestRegressor marginal effects'))
+            print('%-18s%-15s' % ('eval_point:', item['eval_point']))
+            print('%-18s%-15s' % ('window:', item['window']))
+            print('%-18s%-15s' % ('categories:', self.n_class))
+            print('%-18s%-15s' % ('build:', 'Subsampling' if not
+                                  self.replace else 'Bootstrap'))
+            print('%-18s%-15s' % ('n_estimators:', self.n_estimators))
+            print('%-18s%-15s' % ('max_features:', self.max_features))
+            print('%-18s%-15s' % ('min_samples_leaf:', self.min_samples_leaf))
+            print('%-18s%-15s' % ('replace:', self.replace))
+            print('%-18s%-15s' % ('sample_fraction:', self.sample_fraction))
+            print('%-18s%-15s' % ('honesty:', self.honesty))
+            print('%-18s%-15s' % ('honesty_fraction:', self.honesty_fraction))
+            print('%-18s%-15s' % ('inference:', self.inference))
+            print('-' * 60,'Effects:', 
+                  pd.DataFrame(data=item['effects'], 
+                               index=['X' + sub for sub in string_seq_X], 
+                               columns=['Cat' + sub for sub in string_seq_cat]),
+                  '-' * 60, sep='\n')
+            if item['std_errors'] is not None:
+                print('Standard errors:', 
+                      pd.DataFrame(data=item['std_errors'], 
+                                   index=['X' + sub for sub in string_seq_X], 
+                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                      '-' * 60, sep='\n')
+        # empty return
+        return None
+    
+    def plot(self):
+        """
+        Plot the probability distributions fitted by the OrderedRandomForest
+
+        Parameters
+        ----------
+        None.
+
+        Returns
+        -------
+        None.
+        """
+        # check if input has been fitted (sklearn function)
+        check_is_fitted(self, attributes=["forest"])
+        # Stack true outcomes and predictions and convert to pandas df
+        df_plot = pd.DataFrame(
+            np.concatenate((self.forest['y_fit'].reshape(-1,1),
+                            self.forest['probs']), axis=1))
+        # Convert to wide format
+        # New columns: 
+        #   0 = true outcome
+        #   variable = category where prob is analysed
+        #   value = probability of specific category
+        df_plot_long = pd.melt(df_plot, id_vars=0)
+        # Rename columns
+        df_plot_long = df_plot_long.rename(columns={0: "Outcome",
+                                                    "variable": "Density",
+                                                    "value": "Probability"})
+        # Add strings to columns for nice printing in plot
+        df_plot_long['Outcome'] = (
+            'Class ' + df_plot_long['Outcome'].astype(int).astype(str))
+        df_plot_long['Density'] = (
+            'P(Y=' + df_plot_long['Density'].astype(int).astype(str) + ')')
+        # Compute average prediction per Density-Outcome combination
+        df_plot_mean = df_plot_long.copy()
+        df_plot_mean['Probability'] = df_plot_mean.groupby(
+            ['Density','Outcome'])['Probability'].transform('mean') 
+        # Plot using plotnine package
+        fig = (ggplot(df_plot_long, aes(x = 'Probability', fill = 'Density'))
+         + geom_density(alpha = 0.4)
+         + aes(y = "..scaled..")
+         + facet_wrap("Outcome", ncol = 1)
+         + geom_vline(df_plot_mean, aes(xintercept = "Probability", color = "Density"), linetype="dashed")         
+         + xlab("Predicted Probability")
+         + ylab("Probability Mass")
+         + theme_bw()
+         + theme(strip_background = element_rect(fill = "#EBEBEB"))
+         + theme(legend_direction = "horizontal", 
+                 legend_position = (0.5, -0.03))
+         + ggtitle("Distribution of Ordered Forest Probability Predictions")
+         )
+        # empty return
+        return fig
 
 
-    # Function to compute variance of predictions.
-    # -> Does the N in the formula refer to n_samples or to n_est?
-    def honest_variance(self, probs, weights, outcome_binary, nclass, n_est):
-        """Compute the variance of predictions (out-of-sample)."""
-        # ### (single class) Variance computation:
-        # Create storage containers
-        honest_multi_demeaned = {}
-        honest_variance = {}
-        # Loop over classes
-        for class_idx in range(1, nclass, 1):
-            # divide predictions by N to obtain mean after summing up
-            honest_pred_mean = np.reshape(
-                probs[:, (class_idx-1)] / n_est, (-1, 1))
-            # calculate standard multiplication of weights and outcomes
-            honest_multi = np.multiply(
-                weights[class_idx], outcome_binary[class_idx].reshape((1, -1)))
-            # subtract the mean from each obs i
-            honest_multi_demeaned[class_idx] = honest_multi - honest_pred_mean
-            # compute the square
-            honest_multi_demeaned_sq = np.square(
-                honest_multi_demeaned[class_idx])
-            # sum over all i in honest sample
-            honest_multi_demeaned_sq_sum = np.sum(
-                honest_multi_demeaned_sq, axis=1)
-            # multiply by N/N-1 (normalize)
-            honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
-                                          (n_est/(n_est-1)))
-        # ### Covariance computation:
-        # Shift categories for computational convenience
-        # Postpend matrix of zeros
-        honest_multi_demeaned_0_last = honest_multi_demeaned
-        honest_multi_demeaned_0_last[nclass] = np.zeros(
-            honest_multi_demeaned_0_last[1].shape)
-        # Prepend matrix of zeros
-        honest_multi_demeaned_0_first = {}
-        honest_multi_demeaned_0_first[1] = np.zeros(
-            honest_multi_demeaned[1].shape)
-        # Shift existing matrices by 1 class
-        for class_idx in range(1, nclass, 1):
-            honest_multi_demeaned_0_first[
-                class_idx+1] = honest_multi_demeaned[class_idx]
-        # Create storage container
-        honest_covariance = {}
-        # Loop over classes
-        for class_idx in range(1, nclass+1, 1):
-            # multiplication of category m with m-1
-            honest_multi_demeaned_cov = np.multiply(
-                honest_multi_demeaned_0_first[class_idx],
-                honest_multi_demeaned_0_last[class_idx])
-            # sum all obs i in honest sample
-            honest_multi_demeaned_cov_sum = np.sum(
-                honest_multi_demeaned_cov, axis=1)
-            # multiply by (N/N-1)*2
-            honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
-                n_est/(n_est-1))
-        # ### Put everything together
-        # Shift categories for computational convenience
-        # Postpend matrix of zeros
-        honest_variance_last = honest_variance
-        honest_variance_last[nclass] = np.zeros(honest_variance_last[1].shape)
-        # Prepend matrix of zeros
-        honest_variance_first = {}
-        honest_variance_first[1] = np.zeros(honest_variance[1].shape)
-        # Shift existing matrices by 1 class
-        for class_idx in range(1, nclass, 1):
-            honest_variance_first[class_idx+1] = honest_variance[class_idx]
-        # Create storage container
-        honest_variance_final = np.empty((probs.shape[0], nclass))
-        # Compute final variance according to: var_last + var_first - cov
-        for class_idx in range(1, nclass+1, 1):
-            honest_variance_final[
-                :, (class_idx-1):class_idx] = honest_variance_last[
-                    class_idx].reshape(-1, 1) + honest_variance_first[
-                    class_idx].reshape(-1, 1) - honest_covariance[
-                        class_idx].reshape(-1, 1)
-        return honest_variance_final
+class OrderedRandomForest(OrderedForest):
+    """
+    Ordered Random Forests class labeled 'OrderedForest'.
 
-    # Function to compute variance of predictions.
-    # -> Does the N in the formula refer to n_samples or to n_est?
-    # -> This depends on which data is passed to the function:
-    # for train sample N=n_tr and for honest sample N=n_est
-    def get_honest_variance(self, probs, weights, outcome_binary, nclass,
-                            ind_tr, ind_est):
-        """Compute the variance of predictions (in-sample)."""
-        # get the number of observations in train and honest sample
-        n_est = len(ind_est)
-        n_tr = len(ind_tr)
-        # ### (single class) Variance computation:
-        # ## Create storage containers
-        # honest sample
-        honest_multi_demeaned = {}
-        honest_variance = {}
-        # train sample
-        train_multi_demeaned = {}
-        train_variance = {}
-        # Loop over classes
-        for class_idx in range(1, nclass, 1):
-            # divide predictions by N to obtain mean after summing up
-            # honest sample
-            honest_pred_mean = np.reshape(
-                probs[ind_est, (class_idx-1)] / n_est, (-1, 1))
-            # train sample
-            train_pred_mean = np.reshape(
-                probs[ind_tr, (class_idx-1)] / n_tr, (-1, 1))
-            # calculate standard multiplication of weights and outcomes
-            # outcomes need to be from the honest sample (outcome_binary_est)
-            # for both honest and train multi
-            # honest sample
-            honest_multi = np.multiply(
-                weights[class_idx][ind_est, :],
-                outcome_binary[class_idx].reshape((1, -1)))
-            # train sample
-            train_multi = np.multiply(
-                weights[class_idx][ind_tr, :],
-                outcome_binary[class_idx].reshape((1, -1)))
-            # subtract the mean from each obs i
-            # honest sample
-            honest_multi_demeaned[class_idx] = honest_multi - honest_pred_mean
-            # train sample
-            train_multi_demeaned[class_idx] = train_multi - train_pred_mean
-            # compute the square
-            # honest sample
-            honest_multi_demeaned_sq = np.square(
-                honest_multi_demeaned[class_idx])
-            # train sample
-            train_multi_demeaned_sq = np.square(
-                train_multi_demeaned[class_idx])
-            # sum over all i in the corresponding sample
-            # honest sample
-            honest_multi_demeaned_sq_sum = np.sum(
-                honest_multi_demeaned_sq, axis=1)
-            # train sample
-            train_multi_demeaned_sq_sum = np.sum(
-                train_multi_demeaned_sq, axis=1)
-            # multiply by N/N-1 (normalize), N for the corresponding sample
-            # honest sample
-            honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
-                                          (n_est/(n_est-1)))
-            # train sample
-            train_variance[class_idx] = (train_multi_demeaned_sq_sum *
-                                         (n_tr/(n_tr-1)))
+    includes methods to fit the model, predict and estimate marginal effects.
 
-        # ### Covariance computation:
-        # Shift categories for computational convenience
-        # Postpend matrix of zeros
-        # honest sample
-        honest_multi_demeaned_0_last = honest_multi_demeaned
-        honest_multi_demeaned_0_last[nclass] = np.zeros(
-            honest_multi_demeaned_0_last[1].shape)
-        # train sample
-        train_multi_demeaned_0_last = train_multi_demeaned
-        train_multi_demeaned_0_last[nclass] = np.zeros(
-            train_multi_demeaned_0_last[1].shape)
-        # Prepend matrix of zeros
-        # honest sample
-        honest_multi_demeaned_0_first = {}
-        honest_multi_demeaned_0_first[1] = np.zeros(
-            honest_multi_demeaned[1].shape)
-        # train sample
-        train_multi_demeaned_0_first = {}
-        train_multi_demeaned_0_first[1] = np.zeros(
-            train_multi_demeaned[1].shape)
-        # Shift existing matrices by 1 class
-        # honest sample
-        for class_idx in range(1, nclass, 1):
-            honest_multi_demeaned_0_first[
-                class_idx+1] = honest_multi_demeaned[class_idx]
-        # train sample
-        for class_idx in range(1, nclass, 1):
-            train_multi_demeaned_0_first[
-                class_idx+1] = train_multi_demeaned[class_idx]
-        # Create storage container
-        honest_covariance = {}
-        train_covariance = {}
-        # Loop over classes
-        for class_idx in range(1, nclass+1, 1):
-            # multiplication of category m with m-1
-            # honest sample
-            honest_multi_demeaned_cov = np.multiply(
-                honest_multi_demeaned_0_first[class_idx],
-                honest_multi_demeaned_0_last[class_idx])
-            # train sample
-            train_multi_demeaned_cov = np.multiply(
-                train_multi_demeaned_0_first[class_idx],
-                train_multi_demeaned_0_last[class_idx])
-            # sum all obs i in honest sample
-            honest_multi_demeaned_cov_sum = np.sum(
-                honest_multi_demeaned_cov, axis=1)
-            # sum all obs i in train sample
-            train_multi_demeaned_cov_sum = np.sum(
-                train_multi_demeaned_cov, axis=1)
-            # multiply by (N/N-1)*2
-            # honest sample
-            honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
-                n_est/(n_est-1))
-            # train sample
-            train_covariance[class_idx] = train_multi_demeaned_cov_sum*2*(
-                n_tr/(n_tr-1))
+    Parameters
+    ----------
+    n_estimators : TYPE: integer
+        DESCRIPTION: Number of trees in the forest. The default is 1000.
+    min_samples_leaf : TYPE: integer
+        DESCRIPTION: Minimum leaf size in the forest. The default is 5.
+    max_features : TYPE: float
+        DESCRIPTION: Share of random covariates (0,1). The default is 0.3.
+    replace : TYPE: bool
+        DESCRIPTION: If True sampling with replacement, i.e. bootstrap is used
+        to grow the trees, otherwise subsampling without replacement is used.
+        The default is False.
+    sample_fraction : TYPE: float
+        DESCRIPTION: Subsampling rate, i.e. the share of samples to draw from
+        X to train each tree. The default is 0.5.
+    honesty : TYPE: bool
+        DESCRIPTION: If True honest forest is built using sample splitting.
+        The default is False.
+    honesty_fraction : TYPE: float
+        DESCRIPTION: Share of observations belonging to honest sample not used
+        for growing the forest. The default is 0.5.
+    inference : TYPE: bool
+        DESCRIPTION: If True the weight based inference is conducted. The
+        default is False.
+    n_jobs : TYPE: int or None
+        DESCRIPTION: The number of parallel jobs to be used for parallelism;
+        follows joblib semantics. n_jobs=-1 means all - 1 available cpu cores.
+        n_jobs=None means no parallelism. There is no parallelism implemented
+        for pred_method='numpy'. The default is -1.
+    pred_method : TYPE str, one of 'cython', 'loop', 'numpy', 'numpy_loop'
+        'numpy_loop_multi', 'numpy_loop_mpire' or 'numpy_sparse'.
+        DESCRIPTION: Which method to use to compute honest predictions. The
+        default is 'numpy_loop_mpire'.
+    weight_method : TYPE str, one of 'numpy_loop', 'numpy_loop_mpire',
+        numpy_loop_multi', numpy_loop_shared_multi or numpy_loop_shared_mpire.
+        DESCRIPTION: Which method to use to compute honest weights. The
+        default is 'numpy_loop_shared_mpire'.
+    random_state : TYPE: int, None or numpy.random.RandomState object
+        DESCRIPTION: Random seed used to initialize the pseudo-random number
+        generator. The default is None. See numpy documentation for details.
 
-        # ### Put everything together
-        # Shift categories for computational convenience
-        # Postpend matrix of zeros
-        # honest sample
-        honest_variance_last = honest_variance
-        honest_variance_last[nclass] = np.zeros(honest_variance_last[1].shape)
-        # train sample
-        train_variance_last = train_variance
-        train_variance_last[nclass] = np.zeros(train_variance_last[1].shape)
-        # Prepend matrix of zeros
-        # honest sample
-        honest_variance_first = {}
-        honest_variance_first[1] = np.zeros(honest_variance[1].shape)
-        # train sample
-        train_variance_first = {}
-        train_variance_first[1] = np.zeros(train_variance[1].shape)
-        # Shift existing matrices by 1 class
-        for class_idx in range(1, nclass, 1):
-            # honest sample
-            honest_variance_first[class_idx+1] = honest_variance[class_idx]
-            # train sample
-            train_variance_first[class_idx+1] = train_variance[class_idx]
-        # Create storage container
-        honest_variance_final = np.empty((n_est, nclass))
-        train_variance_final = np.empty((n_tr, nclass))
-        # Compute final variance according to: var_last + var_first - cov
-        for class_idx in range(1, nclass+1, 1):
-            # honest sample
-            honest_variance_final[
-                :, (class_idx-1):class_idx] = honest_variance_last[
-                    class_idx].reshape(-1, 1) + honest_variance_first[
-                    class_idx].reshape(-1, 1) - honest_covariance[
-                        class_idx].reshape(-1, 1)
-            # train sample
-            train_variance_final[
-                :, (class_idx-1):class_idx] = train_variance_last[
-                    class_idx].reshape(-1, 1) + train_variance_first[
-                    class_idx].reshape(-1, 1) - train_covariance[
-                        class_idx].reshape(-1, 1)
-        # put honest and train sample together
-        variance_final = np.vstack((honest_variance_final,
-                                    train_variance_final))
-        # Combine indices
-        ind_all = np.hstack((ind_est, ind_tr))
-        # Sort variance_final according to indices in ind_all
-        variance_final = variance_final[ind_all.argsort(), :]
-        # retunr final variance
-        return variance_final
-
-# %% Out-of-class honesty and weight functions (for parallelization)
-# define function outside of the class for speedup of multiprocessing
-def honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
-    """Compute the honest leaf means using loop."""
-    # create an empty array to save the leaf means
-    leaf_means = np.empty(max_id)
-    # loop over leaf indices
-    for idx in range(0, max_id):
-        # get row numbers of obs with this leaf index
-        row_idx = np.where(forest_apply[:, tree] == idx)
-        # Compute mean of outcome of these obs
-        if row_idx[0].size == 0:
-            leaf_means[idx] = 0
-        else:
-            leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
-    return leaf_means
-
-@ray.remote
-def honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
-    """Compute the honest leaf means using numpy."""
-    # create an empty array to save the leaf means
-    leaf_means = np.zeros(max_id)
-    # Create dummy matrix dim(n_est, max_id)
-    onehot = OneHotEncoder(sparse=True).fit_transform(
-        forest_apply[:, tree].reshape(-1, 1))
-    # Compute leaf sums for each leaf
-    leaf_sums = onehot.T.dot(outcome_ind_est)
-    # Determine number of observations per leaf
-    leaf_n = onehot.sum(axis=0)
-    # Compute leaf means for each leaf
-    leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
-    return leaf_means
-
-
-def honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
-                            n_est):
-    """Compute the honest weights using numpy."""
-    # extract vectors of leaf IDs
-    leaf_IDs_honest = forest_apply[:, tree]
-    leaf_IDs_all = forest_apply_all[:, tree]
-    # Take care of cases where not all train leafs
-    # populated by observations from honest sample
-    leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-    leaf_IDs_all_u = np.unique(leaf_IDs_all)
-    if np.array_equal(leaf_IDs_honest_u, 
-                      leaf_IDs_all_u):
-        leaf_IDs_honest_ext = leaf_IDs_honest
-        leaf_IDs_all_ext = leaf_IDs_all
-    else:
-        # Find leaf IDs in all that are not in honest
-        extra_honest = np.setdiff1d(
-            leaf_IDs_all_u, leaf_IDs_honest_u)
-        leaf_IDs_honest_ext = np.append(
-            leaf_IDs_honest, extra_honest)
-        # Find leaf IDs in honest that are not in all
-        extra_all = np.setdiff1d(
-            leaf_IDs_honest_u, leaf_IDs_all_u)
-        leaf_IDs_all_ext = np.append(
-            leaf_IDs_all, extra_all)
-    # Generate onehot matrices
-    onehot_honest = OneHotEncoder(
-        sparse=True).fit_transform(
-            leaf_IDs_honest_ext.reshape(-1, 1)).T
-    onehot_all = OneHotEncoder(
-        sparse=True).fit_transform(
-            leaf_IDs_all_ext.reshape(-1, 1))
-    onehot_all = onehot_all[:n_samples,:]
-    # Multiply matrices
-    # (n, n_leafs)x(n_leafs, n_est)
-    tree_out = onehot_all.dot(onehot_honest).todense()
-    # Get leaf sizes
-    # leaf size only for honest sample !!!
-    leaf_size = tree_out.sum(axis=1)
-    # Delete extra observations for unpopulated
-    # honest leaves
-    if not np.array_equal(
-            leaf_IDs_honest_u, leaf_IDs_all_u):
-        tree_out = tree_out[:n_samples, :n_est]
-    # Compute weights
-    tree_out = tree_out/leaf_size
-    return tree_out
-
-
-# multiprocessing with shared memory
-_lock = Lock()  # initiate lock
-
-
-# define tree weight function in shared memory
-def tree_weights(_shared_buffer, tree, forest_apply, forest_apply_all,
-                 n_samples, n_est):
-    # get the tree weights
-    tree_out = honest_weight_numpy_out(tree, forest_apply, forest_apply_all,
-                                       n_samples, n_est)
-    _lock.acquire()
-    _shared_buffer += tree_out  # update the buffer with tree weights
-    _lock.release()
-
-
-# define forest weights function in shared memory using multiprocessing
-def forest_weights_multi(partial_fun, n_samples, n_est, n_jobs, n_estimators):
-    # initiate output in shared memory
-    forest_out = sharedmem.empty((n_samples, n_est), dtype=np.float64)
-    pool = Pool(n_jobs)  # start the multiprocessing pool
-    pool.starmap(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
-    pool.close()  # close parallel
-    pool.join()  # join parallel
-    return forest_out
-
-
-# # define forest weights function in shared memory using mpire (faster)
-def forest_weights_mpire(partial_fun, n_samples, n_est, n_jobs, n_estimators):
-    # initiate output in shared memory
-    forest_out = sharedmem.empty((n_samples, n_est), dtype=np.float64)
-    pool = WorkerPool(n_jobs)  # start the mpire pool
-    pool.map(partial_fun, [(forest_out, _) for _ in range(n_estimators)])
-    pool.stop_and_join()  # stop and join pool
-    return forest_out
+    Returns
+    -------
+    None. Initializes parameters for Ordered Forest.
+    """
+    # define init function
+    def __init__(self, n_estimators=1000,
+                 min_samples_leaf=5,
+                 max_features=0.3,
+                 replace=True,
+                 sample_fraction=0.5,
+                 honesty=False,
+                 honesty_fraction=0.5,
+                 inference=False,
+                 n_jobs=-1,
+                 pred_method='numpy_loop_mpire',
+                 weight_method='numpy_loop_shared_mpire',
+                 random_state=None):
+        # access inherited methods
+        super().__init__(
+            n_estimators=n_estimators,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            replace=replace,
+            sample_fraction=sample_fraction,
+            honesty=honesty,
+            honesty_fraction=honesty_fraction,
+            inference=inference,
+            n_jobs=n_jobs,
+            pred_method=pred_method,
+            weight_method=weight_method,
+            random_state=random_state
+        )
+ 
 
 
