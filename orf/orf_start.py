@@ -6,8 +6,9 @@
 import pandas as pd
 import os
 import numpy as np
-path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+# path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
 os.chdir(path)
 
 # load the ordered forest

@@ -25,6 +25,7 @@ class OrderedForest(BaseOrderedForest):
     Warning: This class should not be used directly. Use derived classes
     instead.
     """
+
     # define init function
     def __init__(self, n_estimators=1000,
                  min_samples_leaf=5,
@@ -53,7 +54,8 @@ class OrderedForest(BaseOrderedForest):
             weight_method=weight_method,
             random_state=random_state
         )
-    
+
+
     # %% Predict function
     # function to predict with estimated ordered forest
     def predict(self, X=None, prob=True):
@@ -77,6 +79,7 @@ class OrderedForest(BaseOrderedForest):
                  result.get("predictions") to extract array of predictions and
                  result.get("variances") to extract array of variances.
         """
+
         # Input checks
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])
@@ -155,16 +158,17 @@ class OrderedForest(BaseOrderedForest):
             else:
                 probs, weights = self._predict_weights(
                     X=X, n_samples=n_samples)
-            # create 2 distinct matrices with zeros and ones for easy subtraction
+
+            # create 2 distinct matrices with zeros and ones for subtraction
             # prepend vector of zeros
             probs_0 = np.hstack((np.zeros((n_samples, 1)), probs))
             # postpend vector of ones
             probs_1 = np.hstack((probs, np.ones((n_samples, 1))))
-            # difference out the adjacent categories to singleout the class probs
+            # difference the adjacent categories to singleout the class probs
             class_probs = probs_1 - probs_0
             # check if some probabilities become negative and set them to zero
             class_probs[class_probs < 0] = 0
-            # normalize predictions to sum up to 1 after non-negativity correction
+            # normalize predictions to sum to 1 after non-negativity correction
             class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
             
             # Check desired type of predictions (applies only to cases where
@@ -193,15 +197,14 @@ class OrderedForest(BaseOrderedForest):
                   'prob': prob,
                   'predictions': pred_final,
                   'variances': var_final}
+
         return result
-    
-    
-    
-    
-    
+
+
     # %% Margin function
     # function to evaluate marginal effects with estimated ordered forest
-    def margin(self, X, eval_point="mean", window=0.1, verbose=True):
+    def margin(self, X=None, X_cat=None, eval_point="mean", window=0.1,
+               verbose=True):
         """
         OrderedRandomForest marginal effects.
 
@@ -211,6 +214,11 @@ class OrderedForest(BaseOrderedForest):
             Matrix of new covariates or None if covariates from
             fit function should be used. If new data provided it must have
             the same number of features as the X in the fit function.
+        X_cat : list or tuple or NoneType
+            List or tuple indicating the columns with categorical covariates,
+            i.e. X_cat=(1,) if the second column includes categorical values.
+            If not defined, covariates with integer values and less than 10
+            unique values are considered to be categorical as default.
         eval_point: string
             Defining evaluation point for marginal effects. These
             can be one of "mean", "atmean", or "atmedian". Default is "mean".
@@ -224,17 +232,17 @@ class OrderedForest(BaseOrderedForest):
         Returns
         -------
         result : dict
-                 Dictionary containing resukts marginal effects estimation.
+                 Dictionary containing results of marginal effects estimation.
                  Use result.get("...") with "effects", "variances",
                  "std_errors", "t-values" or "p-values" to extract arrays of
                  marginal effects, variances, standard errors, t-values or 
                  p-values, respectively.
         """
-        
+
         # Input checks
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])
-        
+
         # Check if X defined properly (sklearn function)
         if not X is None:
             X = check_array(X)
@@ -247,6 +255,21 @@ class OrderedForest(BaseOrderedForest):
             # Check if provided X exactly matches X used in fit function
             if np.array_equal(X, self.forest_['X_fit']):
                 X = None
+
+        # Check if X_cat defined properly
+        if not X_cat is None:
+            if isinstance(X_cat, (list, tuple)):
+                # Check if number of indices is admissible
+                if not len(X_cat) <= self.n_features:
+                    # raise value error
+                    raise ValueError("Number of indices for categorical "
+                                     "covariates must be less or equal "
+                                     "than the overall number of covariates. "
+                                     ", got %s" % len(X_cat))
+            else:
+                # raise value error
+                raise ValueError("X_cat must be of type tuple, list or None"
+                                 ", got %s" % X_cat)
 
         # check whether to predict probabilities or classes
         if not isinstance(verbose, bool):
@@ -277,12 +300,11 @@ class OrderedForest(BaseOrderedForest):
             # raise value error
             raise ValueError("eval_point must be of type string"
                              ", got %s" % eval_point)
-        
+
         # get the indices of the honest sample
         ind_est = self.forest_['ind_est']
         # get inference argument
         inference = self.inference
-        
 
         ## Prepare data sets
         # check if new data provided or not
@@ -306,24 +328,31 @@ class OrderedForest(BaseOrderedForest):
                 # if not using honesty, data refers to the new sample
                 X_eval = X
                 X_est = self.forest_['X_fit']
+
         # get the number of observations in X
         n_samples = _num_samples(X_eval)
-        # define the window size share for evaluating the effect
-        h_std = window    
         
         # check if X is continuous, dummy or categorical
         # first find number of unique values per column
-        X_eval_sort = np.sort(X_eval,axis=0)
-        n_unique = (X_eval_sort[1:,:] != X_eval_sort[:-1,:]).sum(axis=0)+1
+        X_eval_sort = np.sort(X_eval, axis=0)
+        n_unique = (X_eval_sort[1:, :] != X_eval_sort[:-1, :]).sum(axis=0) + 1
+
         # get indices of respective columns
+        # dummies with 2 values
         X_dummy = (n_unique == 2).nonzero()
-        X_categorical = ((n_unique > 2) & (n_unique <= 10)).nonzero()
+
+        # categorical if int and less than 10 values if not supplied by user
+        if X_cat is None:
+            X_cat = (np.all(np.mod(X_eval, 1) == 0, axis=0) &
+                     (n_unique > 2) & (n_unique <= 10)).nonzero()
+
+        # check if there are covariates without variation
         if np.any(n_unique<= 1):
             # raise value error
             raise ValueError("Some of the covariates are constant. This is "
                              "not allowed for evaluation of marginal effects. "
                              "Programme terminated.")
-        
+
         ## Get the evaluation point(s)
         # Save evaluation point(s) in X_mean
         if eval_point == "atmean":
@@ -338,11 +367,11 @@ class OrderedForest(BaseOrderedForest):
         # Get standard deviation of X_est in the same shape as X_mean
         X_sd = np.repeat(np.std(X_est, axis=0, ddof=1).reshape(1,-1
                                                                ),X_rows, axis=0)
-        # create X_up (X_mean + h_std * X_sd)
-        X_up = X_mean + h_std*X_sd
-        # create X_down (X_mean - h_std * X_sd)
-        X_down = X_mean - h_std*X_sd
-            
+        # create X_up (X_mean + window * X_sd)
+        X_up = X_mean + window*X_sd
+        # create X_down (X_mean - window * X_sd)
+        X_down = X_mean - window*X_sd
+
         ## now check if support of X_eval is within X_est
         # check X_max
         X_max = np.repeat(np.max(X_est, axis=0).reshape(1,-1),X_rows, axis=0)
@@ -351,20 +380,21 @@ class OrderedForest(BaseOrderedForest):
         # check if X_up is within the range X_min and X_max
         # If some X_up is larger than the max in X_est, replace entry in X_up 
         # by this max value of X_est. If some X_up is smaller than the min in
-        # X_est, replace entry in X_up by this min value + h_std * X_sd
+        # X_est, replace entry in X_up by this min value + window * X_sd
         X_up = (X_up < X_max) * X_up + (X_up >= X_max) * X_max
-        X_up = (X_up > X_min) * X_up + (X_up <= X_min) * (X_min + h_std * X_sd)
+        X_up = (X_up > X_min) * X_up + (X_up <= X_min) * (X_min + window * X_sd)
         # check if X_down is within the range X_min and X_max
         X_down = (X_down > X_min) * X_down + (X_down <= X_min) * X_min
         X_down = (X_down < X_max) * X_down + (X_down >= X_max) *(
-            X_max - h_std * X_sd)
+            X_max - window * X_sd)
+
         # check if X_up and X_down are same
         if (np.any(X_up == X_down)):
             # adjust to higher share of SD
             X_up = (X_up > X_down) * X_up + (X_up == X_down) * (
-                X_up + 0.5 * h_std * X_sd)
+                X_up + 0.5 * window * X_sd)
             X_down = (X_up > X_down) * X_down + (X_up == X_down) * (
-                X_down - 0.5 * h_std * X_sd)
+                X_down - 0.5 * window * X_sd)
             # check the min max range again
             X_up = (X_up < X_max) * X_up + (X_up >= X_max) * X_max
             X_down = (X_down > X_min) * X_down + (X_down <= X_min) * X_min
@@ -374,13 +404,14 @@ class OrderedForest(BaseOrderedForest):
         X_down[:, X_dummy] = np.min(X_eval[:, X_dummy], axis=0)
         
         # Adjust for categorical variables
-        X_up[:, X_categorical] = np.ceil(X_up[:, X_categorical])
-        X_down[:, X_categorical] = X_up[:, X_categorical]-1
+        X_up[:, X_cat] = np.ceil(X_up[:, X_cat])
+        X_down[:, X_cat] = X_up[:, X_cat]-1
         
         ## Compute predictions
         # Create storage arrays to save predictions
         forest_pred_up = np.empty((X_cols, self.n_class-1))
         forest_pred_down = np.empty((X_cols, self.n_class-1))
+
         # Case 1: No honesty (= no inference)
         if not self.honesty:
             # loop over all covariates
@@ -398,6 +429,7 @@ class OrderedForest(BaseOrderedForest):
                 # Compute mean predictions
                 forest_pred_down[x_id,:] = np.mean(self._predict_default(
                     X=X_mean_down, n_samples=n_samples), axis=0)
+
         if self.honesty and not inference:
             # loop over all covariates
             for x_id in range(X_cols):
@@ -414,6 +446,7 @@ class OrderedForest(BaseOrderedForest):
                 # Compute mean predictions
                 forest_pred_down[x_id,:] = np.mean(self._predict_leafmeans(
                     X=X_mean_down, n_samples=n_samples), axis=0)
+
         if self.honesty and inference:
             # storage container for weight matrices
             forest_weights_up={}
@@ -439,6 +472,7 @@ class OrderedForest(BaseOrderedForest):
                 # but no change im atmean or atmedian)
                 forest_pred_down[x_id,:] = np.mean(
                     forest_pred_down_x_id, axis=0)
+
             # Compute means of weights
             forest_weights_up = {r: {k: np.mean(v, axis=0) for k,v in 
                                      forest_weights_up[r].items()} for r in 
@@ -446,6 +480,7 @@ class OrderedForest(BaseOrderedForest):
             forest_weights_down = {r: {k: np.mean(v, axis=0) for k,v in 
                                      forest_weights_down[r].items()} for r in 
                                  forest_weights_down.keys()}
+
         # ORF predictions for forest_pred_up
         # create 2 distinct matrices with zeros and ones for easy subtraction
         # prepend vector of zeros
@@ -459,12 +494,15 @@ class OrderedForest(BaseOrderedForest):
         # normalize predictions to sum up to 1 after non-negativity correction
         forest_pred_up = forest_pred_up / forest_pred_up.sum(
             axis=1).reshape(-1, 1)
+
         # ORF predictions for forest_pred_down
         # create 2 distinct matrices with zeros and ones for easy subtraction
         # prepend vector of zeros
-        forest_pred_down_0 = np.hstack((np.zeros((X_cols, 1)), forest_pred_down))
+        forest_pred_down_0 = np.hstack((np.zeros((X_cols, 1)),
+                                        forest_pred_down))
         # postpend vector of ones
-        forest_pred_down_1 = np.hstack((forest_pred_down, np.ones((X_cols, 1))))
+        forest_pred_down_1 = np.hstack((forest_pred_down,
+                                        np.ones((X_cols, 1))))
         # difference out the adjacent categories to singleout the class probs
         forest_pred_down = forest_pred_down_1 - forest_pred_down_0
         # check if some probabilities become negative and set them to zero
@@ -480,7 +518,7 @@ class OrderedForest(BaseOrderedForest):
         scaling_factor = np.mean(X_up - X_down, axis=0).reshape(-1,1)
         # Set scaling factor to 1 for categorical and dummy variables
         scaling_factor[X_dummy,:] = 1
-        scaling_factor[X_categorical,:] = 1
+        scaling_factor[X_cat,:] = 1
         # Scale the differences to get the marginal effects
         marginal_effects_scaled = forest_pred_diff_up_down / scaling_factor
         
@@ -496,6 +534,7 @@ class OrderedForest(BaseOrderedForest):
             n_est = len(ind_est)
             # Create storage container for variance
             variance_me = np.empty((X_cols, self.n_class))
+
             # loop over all covariates
             for x_id in range(X_cols):
                 # Generate sub-dictionary
@@ -512,15 +551,19 @@ class OrderedForest(BaseOrderedForest):
                     # Get binary outcoms of honest sample
                     outcome_binary_est = self.forest_['outcome_binary_est'][
                         class_idx].reshape(-1,1)
-                    # compute the conditional means: 1/N(weights%*%y) (predictions are based on honest sample)
+                    # compute the conditional means: 1/N(weights%*%y)
+                    # (predictions are based on honest sample)
                     forest_cond_means = np.multiply(
                         (1/len(self.forest_['ind_est'])), np.dot(
                             forest_weights_diff_up_down, outcome_binary_est))
+
                     # calculate standard multiplication of weights and outcomes
                     forest_multi = np.multiply(
-                        forest_weights_diff_up_down, outcome_binary_est.reshape((1, -1)))
+                        forest_weights_diff_up_down,
+                        outcome_binary_est.reshape((1, -1)))
                     # subtract the mean from each obs i
-                    forest_multi_demeaned[class_idx] = forest_multi - forest_cond_means
+                    forest_multi_demeaned[class_idx] = (
+                        forest_multi - forest_cond_means)
                     # compute the square
                     forest_multi_demeaned_sq = np.square(
                         forest_multi_demeaned[class_idx])
@@ -534,6 +577,7 @@ class OrderedForest(BaseOrderedForest):
                     variance[class_idx] = (
                         forest_multi_demeaned_sq_sum_norm/
                                 scaling_factor_squared[x_id])
+
                 # ### Covariance computation:
                 # Shift categories for computational convenience
                 # Postpend matrix of zeros
@@ -544,10 +588,12 @@ class OrderedForest(BaseOrderedForest):
                 forest_multi_demeaned_0_first = {}
                 forest_multi_demeaned_0_first[1] = np.zeros(
                     forest_multi_demeaned[1].shape)
+
                 # Shift existing matrices by 1 class
                 for class_idx in range(1, self.n_class, 1):
                     forest_multi_demeaned_0_first[
                         class_idx+1] = forest_multi_demeaned[class_idx]
+
                 # Loop over classes
                 for class_idx in range(1, self.n_class+1, 1):
                     # multiplication of category m with m-1
@@ -565,6 +611,7 @@ class OrderedForest(BaseOrderedForest):
                     covariance[class_idx] = (
                         forest_multi_demeaned_cov_sum_norm_mult2/
                         scaling_factor_squared[x_id])
+
                 # ### Put everything together
                 # Shift categories for computational convenience
                 # Postpend matrix of zeros
@@ -573,15 +620,17 @@ class OrderedForest(BaseOrderedForest):
                 # Prepend matrix of zeros
                 variance_first = {}
                 variance_first[1] = np.zeros(variance[1].shape)
+
                 # Shift existing matrices by 1 class
                 for class_idx in range(1, self.n_class, 1):
                     variance_first[class_idx+1] = variance[class_idx]
-                # Compute final variance according to: var_last + var_first - cov
+                # Compute final variance according to: var_last+var_first-cov
                 for class_idx in range(1, self.n_class+1, 1):
                     variance_me[x_id,class_idx-1]  = variance_last[
                             class_idx].reshape(-1, 1) + variance_first[
                             class_idx].reshape(-1, 1) - covariance[
-                                class_idx].reshape(-1, 1)    
+                                class_idx].reshape(-1, 1)
+
             # standard deviations
             sd_me = np.sqrt(variance_me)     
             # t values and p values (control for division by zero)
@@ -595,19 +644,22 @@ class OrderedForest(BaseOrderedForest):
             sd_me = None
             t_values = None
             p_values = None
-        # put everything into a list of results
+
+        # put everything into a dict of results
         results = {'output': 'margin',
                    'eval_point': eval_point,
-                   'window': h_std,
+                   'window': window,
                    'effects': margins,
                    'variances': variance_me,
                    'std_errors': sd_me,
                    't-values': t_values,
                    'p-values': p_values}
+
         # check if marginal effects should be printed
         if verbose:
             string_seq_X = [str(x) for x in np.arange(1,X_cols+1)]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
+
             # print marginal effects nicely
             if not inference:
                 print('-' * 70,
@@ -629,6 +681,7 @@ class OrderedForest(BaseOrderedForest):
                                    index=['X' + sub for sub in string_seq_X], 
                                    columns=['Cat' + sub for sub in string_seq_cat]),
                       '-' * 70, sep='\n')
+
         return results
     
     #Function to predict via sklearn
@@ -708,7 +761,8 @@ class OrderedForest(BaseOrderedForest):
 # End of numpy_loop
 # =============================================================================
         return probs, weights
-    
+
+
     def summary(self, item=None):
         """
         Print forest information and prediction performance.
@@ -723,6 +777,7 @@ class OrderedForest(BaseOrderedForest):
         -------
         None.
         """
+
         # Input checks
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])
@@ -733,6 +788,7 @@ class OrderedForest(BaseOrderedForest):
                 # raise value error
                 raise ValueError("item needs to be prediction or margin "
                                  "output or Nonetype")
+
         if item is None:
             # print the result
             print('-' * 50,'Summary of the OrderedRandomForest estimation', 
@@ -762,8 +818,8 @@ class OrderedForest(BaseOrderedForest):
             print('-' * 50)
         
         elif item['output']=='predict':
-            print('-' * 60, 'Summary of the OrderedRandomForest predictions', '-' * 60, 
-                  sep='\n')
+            print('-' * 60, 'Summary of the OrderedRandomForest predictions',
+                  '-' * 60, sep='\n')
             print('%-18s%-15s' % ('type:', 
                                   'OrderedRandomForest predictions'))
             print('%-18s%-15s' % ('prediction_type:', 'Probability' if 
@@ -827,9 +883,11 @@ class OrderedForest(BaseOrderedForest):
                                    index=['X' + sub for sub in string_seq_X], 
                                    columns=['Cat' + sub for sub in string_seq_cat]),
                       '-' * 60, sep='\n')
+
         # empty return
         return None
-    
+
+
     def plot(self):
         """
         Plot the probability distributions fitted by the OrderedRandomForest
@@ -842,12 +900,14 @@ class OrderedForest(BaseOrderedForest):
         -------
         None.
         """
+
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])
         # Stack true outcomes and predictions and convert to pandas df
         df_plot = pd.DataFrame(
             np.concatenate((self.forest_['y_fit'].reshape(-1,1),
                             self.forest_['probs']), axis=1))
+
         # Convert to wide format
         # New columns: 
         #   0 = true outcome
@@ -867,6 +927,7 @@ class OrderedForest(BaseOrderedForest):
         df_plot_mean = df_plot_long.copy()
         df_plot_mean['Probability'] = df_plot_mean.groupby(
             ['Density','Outcome'])['Probability'].transform('mean') 
+
         # Plot using plotnine package
         fig = (ggplot(df_plot_long, aes(x = 'Probability', fill = 'Density'))
          + geom_density(alpha = 0.4)
@@ -881,9 +942,11 @@ class OrderedForest(BaseOrderedForest):
                  legend_position = (0.5, -0.03))
          + ggtitle("Distribution of OrderedRandomForest Probability Predictions")
          )
+
         # empty return
         return fig
-    
+
+
     # performance measures (public method, available to user)
     def performance(self):
         """
@@ -897,6 +960,7 @@ class OrderedForest(BaseOrderedForest):
         -------
         None. Prints MSE, Classification accuracy and confusion matrix.
         """
+
         # Input checks
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])

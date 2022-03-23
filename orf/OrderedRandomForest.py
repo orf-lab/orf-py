@@ -61,6 +61,7 @@ class OrderedRandomForest(OrderedForest):
     -------
     None. Initializes parameters for Ordered Forest.
     """
+
     # define init function
     def __init__(self, n_estimators=1000,
                  min_samples_leaf=5,
@@ -89,6 +90,3 @@ class OrderedRandomForest(OrderedForest):
             weight_method=weight_method,
             random_state=random_state
         )
- 
-
-

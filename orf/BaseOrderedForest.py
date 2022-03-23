@@ -9,21 +9,24 @@ Definition of base ordered forest estimator and fit function.
 """
 
 # import modules
+import ray
+import sharedmem
+
 import numpy as np
 import pandas as pd
-import sharedmem
+
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.utils import check_random_state, check_X_y
+from sklearn.utils.validation import _num_samples, _num_features
 from econml.grf import RegressionForest
 from joblib import Parallel, delayed, parallel_backend
 from multiprocessing import Pool, cpu_count, Lock
 from mpire import WorkerPool
 from functools import partial
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.utils import check_random_state, check_X_y
-from sklearn.utils.validation import _num_samples, _num_features
-import ray
+
 
 # %% Class definition
     
@@ -61,6 +64,7 @@ class BaseOrderedForest(BaseEstimator):
         self.pred_method = pred_method
         self.weight_method = weight_method
         self.random_state = random_state
+
         # initialize performance metrics
         self.confusion = None
         self.measures = None
@@ -79,6 +83,7 @@ class BaseOrderedForest(BaseEstimator):
         pred_method = self.pred_method
         weight_method = self.weight_method
         random_state = self.random_state
+
         # check the number of trees in the forest
         if isinstance(n_estimators, int):
             # check if its at least 1
@@ -243,7 +248,6 @@ class BaseOrderedForest(BaseEstimator):
             # Initialize ray
             ray.init(num_cpus=self.n_jobs, ignore_reinit_error=True)
         
-
         # check whether weight_method is defined correctly
         if (weight_method == 'numpy_loop'
                 or weight_method == 'numpy_loop_mpire'
@@ -266,10 +270,6 @@ class BaseOrderedForest(BaseEstimator):
         # use this to initialize seed for honest splitting: this is useful when
         # we want to obtain the same splits later on
         self.subsample_random_seed = self.random_state.randint(max_int)
-
-        # initialize performance metrics
-        self.confusion = None
-        self.measures = None
         
     
     # %% Fit function
@@ -290,6 +290,7 @@ class BaseOrderedForest(BaseEstimator):
         self : object
                The fitted estimator.
         """
+
         self._input_checks()
         # Use sklearn input checks to allow for multiple types of inputs:
         # - returns numpy arrays for X and y (no matter which input type)
@@ -297,9 +298,10 @@ class BaseOrderedForest(BaseEstimator):
         X,y = check_X_y(X,y, y_numeric=True, estimator="OrderedRandomForest")
         # Get vector of sorted unique values of y
         y_values = np.unique(y)
+
         # Get the number of outcome classes
         self.n_class = nclass = len(y_values)
-        # Next, ensure that y is a vector of contiguous integers starting at 
+        # Next, ensure that y is a vector of continuous integers starting at 
         # 1 up to nclass
         # Check if y consists of integers
         if not all(isinstance(x, (np.integer)) for x in y_values):
@@ -310,21 +312,6 @@ class BaseOrderedForest(BaseEstimator):
             if not ((min(y_values)==1) and (max(y_values)==nclass)):
                 # Recode y appropriately
                 y = np.searchsorted(np.unique(y), y)+1
-
-# =============================================================================
-#         # check if features X are a pandas dataframe
-#         self.__xcheck(X)
-# 
-#         # check if outcome y is a pandas series
-#         if isinstance(y, pd.Series):
-#             # check if its non-empty
-#             if y.empty:
-#                 # raise value error
-#                 raise ValueError("y Series is empty. Check the input.")
-#         else:
-#             # raise value error
-#             raise ValueError("y is not a Pandas Series. Recode the input.")
-# =============================================================================
 
         # obtain total number of observations
         n_samples = _num_samples(X)
@@ -341,6 +328,7 @@ class BaseOrderedForest(BaseEstimator):
         outcome_binary_est = {}
         #  create an empty dictionary to save the weights matrices
         weights = {}
+
         # generate honest estimation sample
         if self.honesty:
             # initialize random state for sample splitting
@@ -363,11 +351,13 @@ class BaseOrderedForest(BaseEstimator):
             X_est = None
             ind_tr = np.arange(n_samples)
             ind_est = None
+
         # estimate random forest on each class outcome except the last one
         for class_idx in range(1, nclass, 1):
             # create binary outcome indicator for the outcome in the forest
             outcome_ind = (y_tr <= class_idx) * 1
             outcome_binary[class_idx] = np.array(outcome_ind)
+
             # check whether to do subsampling or not
             if self.replace:
                 # call rf from scikit learn and save it in dictionary
@@ -393,6 +383,7 @@ class BaseOrderedForest(BaseEstimator):
                     honest=False,  # default is True!
                     inference=False,  # default is True!
                     subforest_size=1)
+
                 # fit the model with the binary outcome
                 forests[class_idx].fit(X=X_tr, y=outcome_ind)
                 # if no honesty, get the oob predictions
@@ -409,6 +400,7 @@ class BaseOrderedForest(BaseEstimator):
                     outcome_binary_est[class_idx] = np.array(outcome_ind_est)
                     # compute maximum leaf id
                     max_id = np.max(forest_apply)+1
+
                     if self.inference:
                         # Get size of estimation sample
                         n_est = forest_apply.shape[0]
@@ -557,120 +549,6 @@ class BaseOrderedForest(BaseEstimator):
                                 tree_out = tree_out/leaf_size
                                 # add tree weights to overall forest weights
                                 forest_out = forest_out + tree_out
-                                
-                        
-# =============================================================================
-#                         # Loop over trees (via loops)
-#                         for tree in range(self.n_estimators):
-#                             # extract vectors of leaf IDs
-#                             leaf_IDs_honest = forest_apply[:, tree]
-#                             leaf_IDs_all = forest_apply_all[:, tree]
-#                             # Compute leaf sizes in honest sample
-#                             unique, counts = np.unique(
-#                                 leaf_IDs_honest, return_counts=True)
-#                             # generate storage matrices for weights
-#                             tree_out = np.empty((n_samples, n_est))
-#                             # Loop over sample of evaluation
-#                             for i in range(n_samples):
-#                                 # Loop over honest sample
-#                                 for j in range(n_est):
-#                                     # If leaf indices coincide...
-#                                     if (leaf_IDs_all[i] ==
-#                                             leaf_IDs_honest[j]):
-#                                         # ... assign 1 to weight matrix
-#                                         tree_out[i, j] = 1
-#                                     # else assign 0
-#                                     else:
-#                                         tree_out[i, j] = 0
-#                                 # Compute number of observations in this
-#                                 # leaf in the honest sample
-#                                 # leaf_size = np.sum(tree_out[i, :])
-#                                 leaf_size = counts[np.where(
-#                                     unique == leaf_IDs_all[i])]
-#                                 # If leaf size > 0 divide by leaf size
-#                                 if leaf_size > 0:
-#                                     tree_out[i, :] = (
-#                                         tree_out[i, :] / leaf_size)
-#                             # add tree weights to overall forest weights
-#                             forest_out += tree_out
-# =============================================================================
-
-# =============================================================================
-#                         # generate storage matrix for weights
-#                         n_tr = len(ind_tr)
-#                         forest_out_train = np.zeros((n_tr, n_est))
-#                         forest_out_honest = np.zeros((n_est, n_est))
-#
-#                         # Loop over trees (via loops)
-#                         for tree in range(self.n_estimators):
-#                             # extract vectors of leaf IDs
-#                             leaf_IDs_honest = forest_apply[:, tree]
-#                             leaf_IDs_train = forest_apply_tr[:, tree]
-#                             # Compute leaf sizes in honest sample
-#                             unique, counts = np.unique(
-#                                 leaf_IDs_honest, return_counts=True)
-#                             # train sample
-#                             # generate storage matrices for weights
-#                             tree_out_train = np.empty((n_tr, n_est))
-#                             # Loop over train sample
-#                             for i in range(n_tr):
-#                                 # Loop over honest sample
-#                                 for j in range(n_est):
-#                                     # If leaf indices coincide...
-#                                     if (leaf_IDs_train[i] ==
-#                                             leaf_IDs_honest[j]):
-#                                         # ... assign 1 to weight matrix
-#                                         tree_out_train[i, j] = 1
-#                                     # else assign 0
-#                                     else:
-#                                         tree_out_train[i, j] = 0
-#                                 # Compute number of observations in this
-#                                 # leaf in the honest sample
-#                                 # leaf_size = np.sum(tree_out[i, :])
-#                                 leaf_size = counts[np.where(
-#                                     unique == leaf_IDs_train[i])]
-#                                 # If leaf size > 0 divide by leaf size
-#                                 if leaf_size > 0:
-#                                     tree_out_train[i, :] = (
-#                                         tree_out_train[i, :] / leaf_size)
-#                             # add tree weights to overall forest weights
-#                             forest_out_train += tree_out_train
-#
-#                             # honest sample
-#                             # generate storage matrices for weights
-#                             tree_out_honest = np.empty((n_est, n_est))
-#                             # Loop over train sample
-#                             for i in range(n_tr):
-#                                 # Loop over honest sample
-#                                 for j in range(n_est):
-#                                     # If leaf indices coincide...
-#                                     if (leaf_IDs_honest[i] ==
-#                                             leaf_IDs_honest[j]):
-#                                         # ... assign 1 to weight matrix
-#                                         tree_out_honest[i, j] = 1
-#                                     # else assign 0
-#                                     else:
-#                                         tree_out_honest[i, j] = 0
-#                                 # Compute number of observations in this
-#                                 # leaf in the honest sample
-#                                 # leaf_size = np.sum(tree_out[i, :])
-#                                 leaf_size = counts[np.where(
-#                                     unique == leaf_IDs_honest[i])]
-#                                 # If leaf size > 0 divide by leaf size
-#                                 if leaf_size > 0:
-#                                     tree_out_honest[i, :] = (
-#                                         tree_out_honest[i, :] / leaf_size)
-#                             # add tree weights to overall forest weights
-#                             forest_out_honest += tree_out_honest
-#
-#                         # combine train and honest sample
-#                         forest_out = np.vstack((forest_out_honest,
-#                                                 forest_out_train))
-#                         # Combine indices
-#                         ind_all = np.hstack((ind_est, ind_tr))
-#                         # Sort forest_out according to indices in ind_all
-#                         forest_out = forest_out[ind_all.argsort(), :]
-# =============================================================================
 
                         # Divide by the number of trees to obtain final weights
                         forest_out = forest_out / self.n_estimators
@@ -805,23 +683,11 @@ class BaseOrderedForest(BaseEstimator):
                                 leaf_means_vec, (-1, max_id)).T
                             # assign the honest predictions, i.e. fitted values
                             fitted[class_idx] = leaf_means
-
-                        # if self.pred_method == 'numpy_loop':
-                        #     # Loop over trees
-                        #     leaf_means = Parallel(n_jobs=self.n_jobs,
-                        #                           backend="loky")(
-                        #         delayed(self._honest_fit_numpy_func)(
-                        #             tree=tree,
-                        #             forest_apply=forest_apply,
-                        #             outcome_ind_est=outcome_ind_est,
-                        #             max_id=max_id) for tree in range(
-                        #                 0, self.n_estimators))
-                        #     # assign honest predictions, i.e. fitted values
-                        #     fitted[class_idx] = np.vstack(leaf_means).T
                             
                         if self.pred_method == 'numpy_loop':
                             # Loop over trees
-                            with parallel_backend('threading', n_jobs=self.n_jobs):
+                            with parallel_backend('threading',
+                                                  n_jobs=self.n_jobs):
                                 leaf_means = Parallel()(
                                     delayed(self._honest_fit_numpy_func)(
                                     tree=tree,
@@ -844,7 +710,6 @@ class BaseOrderedForest(BaseEstimator):
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
 
-
                         # Check whether to use multiprocessing or not
                         if self.pred_method == 'numpy_loop_multi':
                             # setup the pool for multiprocessing
@@ -861,7 +726,6 @@ class BaseOrderedForest(BaseEstimator):
                             pool.join()  # join parallel
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
-
 
                         if self.pred_method == 'numpy_loop_mpire':
                             # define partial function by fixing parameters
@@ -896,6 +760,7 @@ class BaseOrderedForest(BaseEstimator):
                         y_hat = fitted[class_idx][forest_apply, grid]
                         # Average over trees
                         probs[:, class_idx-1] = np.mean(y_hat, axis=1)
+
         # create 2 distinct matrices with zeros and ones for easy subtraction
         # prepend vector of zeros
         probs_0 = np.hstack((np.zeros((n_samples, 1)), probs))
@@ -907,11 +772,6 @@ class BaseOrderedForest(BaseEstimator):
         class_probs[class_probs < 0] = 0
         # normalize predictions to sum up to 1 after non-negativity correction
         class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
-        
-        # Don't transform to pandas df!!! Uncomment next two rows to use "old"
-        # predict function
-        # labels = ['Class ' + str(c_idx) for c_idx in range(1, nclass + 1)]
-        # class_probs = pd.DataFrame(class_probs, columns=labels)
         
         # Compute variance of predicitons if inference = True
         # outcome need to come from the honest sample here, outcome_binary_est
@@ -939,15 +799,9 @@ class BaseOrderedForest(BaseEstimator):
             ind_all = np.hstack((ind_est, ind_tr))
             # Sort variance according to indices in ind_all
             variance = variance[ind_all.argsort(), :]
-
-# =============================================================================
-#             variance = self._get_honest_variance(
-#                 probs=probs, weights=weights,
-#                 outcome_binary=outcome_binary_est,
-#                 nclass=nclass, ind_tr=ind_tr, ind_est=ind_est)
-# =============================================================================
         else:
             variance = {}
+
         # pack estimated forest and class predictions into output dictionary
         self.forest_ = {'forests': forests,
                         'probs': class_probs,
@@ -963,8 +817,8 @@ class BaseOrderedForest(BaseEstimator):
         self._performance(y, y_values)
         # return the output
         return self
-    
-    
+
+
     # %% Performance functions
     # performance measures (private method, not available to user)
     def _performance(self, y, y_values):
@@ -980,6 +834,7 @@ class BaseOrderedForest(BaseEstimator):
         -------
         None. Calculates MSE, Classification accuracy and confusion matrix.
         """
+
         # take over needed values
         predictions = self.forest_['probs']
 
@@ -1026,39 +881,10 @@ class BaseOrderedForest(BaseEstimator):
         return None
 
 
-# Not needed anymore, use sklearn check_X_y instead
-# =============================================================================
-#     # check user input for covariates (private method, not available to user)
-#     def __xcheck(self, X):
-#         """
-#         Check the user input for the pandas dataframe of covariates.
-# 
-#         Parameters
-#         ----------
-#         X : TYPE: pd.DataFrame
-#             DESCRIPTION: matrix of covariates.
-# 
-#         Returns
-#         -------
-#         None. Checks for the correct user input.
-#         """
-#         # check if features X are a pandas dataframe
-#         if isinstance(X, pd.DataFrame):
-#             # check if its non-empty
-#             if X.empty:
-#                 # raise value error
-#                 raise ValueError("X DataFrame is empty. Check the input.")
-#         else:
-#             # raise value error
-#             raise ValueError("X is not a Pandas DataFrame. Recode the input.")
-# 
-#         # empty return
-#         return None
-# =============================================================================
-
     # %% In-class honesty and weight functions
     def _honest_fit_func(self, tree, forest_apply, outcome_ind_est, max_id):
         """Compute the honest leaf means using loop."""
+
         # create an empty array to save the leaf means
         leaf_means = np.empty(max_id)
         # loop over leaf indices
@@ -1070,11 +896,14 @@ class BaseOrderedForest(BaseEstimator):
                 leaf_means[idx] = 0
             else:
                 leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
+
         return leaf_means
+
 
     def _honest_fit_numpy_func(self, tree, forest_apply, outcome_ind_est,
                               max_id):
         """Compute the honest leaf means using numpy."""
+
         # create an empty array to save the leaf means
         leaf_means = np.zeros(max_id)
         # Create dummy matrix dim(n_est, max_id)
@@ -1086,11 +915,14 @@ class BaseOrderedForest(BaseEstimator):
         leaf_n = onehot.sum(axis=0)
         # Compute leaf means for each leaf
         leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+
         return leaf_means
+
 
     def _honest_weight_numpy(self, tree, forest_apply, forest_apply_all,
                             n_samples, n_est):
         """Compute the honest weights using numpy."""
+
         # extract vectors of leaf IDs
         leaf_IDs_honest = forest_apply[:, tree]
         leaf_IDs_all = forest_apply_all[:, tree]
@@ -1098,6 +930,7 @@ class BaseOrderedForest(BaseEstimator):
         # populated by observations from honest sample
         leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
         leaf_IDs_all_u = np.unique(leaf_IDs_all)
+
         if np.array_equal(leaf_IDs_honest_u, 
                           leaf_IDs_all_u):
             leaf_IDs_honest_ext = leaf_IDs_honest
@@ -1113,6 +946,7 @@ class BaseOrderedForest(BaseEstimator):
                 leaf_IDs_honest_u, leaf_IDs_all_u)
             leaf_IDs_all_ext = np.append(
                 leaf_IDs_all, extra_all)
+
         # Generate onehot matrices
         onehot_honest = OneHotEncoder(
             sparse=True).fit_transform(
@@ -1127,6 +961,7 @@ class BaseOrderedForest(BaseEstimator):
         # Get leaf sizes
         # leaf size only for honest sample !!!
         leaf_size = tree_out.sum(axis=1)
+
         # Delete extra observations for unpopulated
         # honest leaves
         if not np.array_equal(
@@ -1134,63 +969,20 @@ class BaseOrderedForest(BaseEstimator):
             tree_out = tree_out[:n_samples, :n_est]
         # Compute weights
         tree_out = tree_out/leaf_size
-        return tree_out
 
- 
-# =============================================================================
-#     def _honest_weight_numpy(self, n_tree, forest_out, forest_apply, forest_apply_all,
-#                             n_samples, n_est):
-#         """Compute the honest weights using numpy."""
-#         # generate storage matrix for weights
-#         forest_out = np.zeros((n_samples, n_est))
-#         # Loop over trees
-#         for tree in range(n_tree):
-#             # extract vectors of leaf IDs
-#             leaf_IDs_honest = forest_apply[:, tree]
-#             leaf_IDs_all = forest_apply_all[:, tree]
-#             # Take care of cases where not all training leafs
-#             # populated by observations from honest sample
-#             leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-#             leaf_IDs_all_u = np.unique(leaf_IDs_all)
-#             if (leaf_IDs_honest_u.size == leaf_IDs_all_u.size):
-#                 leaf_IDs_honest_ext = leaf_IDs_honest
-#             else:
-#                 extra = np.setxor1d(leaf_IDs_all_u,
-#                                     leaf_IDs_honest_u)
-#                 leaf_IDs_honest_ext = np.append(
-#                     leaf_IDs_honest, extra)
-#             # Generate onehot matrices
-#             onehot_honest = OneHotEncoder(
-#                 sparse=True).fit_transform(
-#                     leaf_IDs_honest_ext.reshape(-1, 1)).T
-#             onehot_all = OneHotEncoder(
-#                 sparse=True).fit_transform(
-#                     leaf_IDs_all.reshape(-1, 1))
-#             # Multiply matrices (n, n_leafs)x(n_leafs, n_est)
-#             tree_out = onehot_all.dot(onehot_honest).todense()
-#             # Get leaf sizes
-#             # leaf size only for honest sample !!!
-#             leaf_size = tree_out.sum(axis=1)
-#             # Delete extra observations for unpopulated honest
-#             # leaves
-#             if not leaf_IDs_honest_u.size == leaf_IDs_all_u.size:
-#                 tree_out = tree_out[:n_samples, :n_est]
-#             # Compute weights
-#             tree_out = tree_out/leaf_size
-#             # add tree weights to overall forest weights
-#             forest_out = forest_out + tree_out
-#             return forest_out
-# =============================================================================
+        return tree_out
 
 
     # Function to compute variance of predictions.
     # -> Does the N in the formula refer to n_samples or to n_est?
     def _honest_variance(self, probs, weights, outcome_binary, nclass, n_est):
         """Compute the variance of predictions (out-of-sample)."""
+
         # ### (single class) Variance computation:
         # Create storage containers
         honest_multi_demeaned = {}
         honest_variance = {}
+
         # Loop over classes
         for class_idx in range(1, nclass, 1):
             # divide predictions by N to obtain mean after summing up
@@ -1210,6 +1002,7 @@ class BaseOrderedForest(BaseEstimator):
             # multiply by N/N-1 (normalize)
             honest_variance[class_idx] = (honest_multi_demeaned_sq_sum *
                                           (n_est/(n_est-1)))
+
         # ### Covariance computation:
         # Shift categories for computational convenience
         # Postpend matrix of zeros
@@ -1220,10 +1013,12 @@ class BaseOrderedForest(BaseEstimator):
         honest_multi_demeaned_0_first = {}
         honest_multi_demeaned_0_first[1] = np.zeros(
             honest_multi_demeaned[1].shape)
+
         # Shift existing matrices by 1 class
         for class_idx in range(1, nclass, 1):
             honest_multi_demeaned_0_first[
                 class_idx+1] = honest_multi_demeaned[class_idx]
+
         # Create storage container
         honest_covariance = {}
         # Loop over classes
@@ -1238,6 +1033,7 @@ class BaseOrderedForest(BaseEstimator):
             # multiply by (N/N-1)*2
             honest_covariance[class_idx] = honest_multi_demeaned_cov_sum*2*(
                 n_est/(n_est-1))
+
         # ### Put everything together
         # Shift categories for computational convenience
         # Postpend matrix of zeros
@@ -1246,9 +1042,11 @@ class BaseOrderedForest(BaseEstimator):
         # Prepend matrix of zeros
         honest_variance_first = {}
         honest_variance_first[1] = np.zeros(honest_variance[1].shape)
+
         # Shift existing matrices by 1 class
         for class_idx in range(1, nclass, 1):
             honest_variance_first[class_idx+1] = honest_variance[class_idx]
+
         # Create storage container
         honest_variance_final = np.empty((probs.shape[0], nclass))
         # Compute final variance according to: var_last + var_first - cov
@@ -1258,7 +1056,9 @@ class BaseOrderedForest(BaseEstimator):
                     class_idx].reshape(-1, 1) + honest_variance_first[
                     class_idx].reshape(-1, 1) - honest_covariance[
                         class_idx].reshape(-1, 1)
+
         return honest_variance_final
+
 
     # Function to compute variance of predictions.
     # -> Does the N in the formula refer to n_samples or to n_est?
@@ -1267,6 +1067,7 @@ class BaseOrderedForest(BaseEstimator):
     def _get_honest_variance(self, probs, weights, outcome_binary, nclass,
                             ind_tr, ind_est):
         """Compute the variance of predictions (in-sample)."""
+
         # get the number of observations in train and honest sample
         n_est = len(ind_est)
         n_tr = len(ind_tr)
@@ -1278,6 +1079,7 @@ class BaseOrderedForest(BaseEstimator):
         # train sample
         train_multi_demeaned = {}
         train_variance = {}
+
         # Loop over classes
         for class_idx in range(1, nclass, 1):
             # divide predictions by N to obtain mean after summing up
@@ -1345,6 +1147,7 @@ class BaseOrderedForest(BaseEstimator):
         train_multi_demeaned_0_first = {}
         train_multi_demeaned_0_first[1] = np.zeros(
             train_multi_demeaned[1].shape)
+
         # Shift existing matrices by 1 class
         # honest sample
         for class_idx in range(1, nclass, 1):
@@ -1354,6 +1157,7 @@ class BaseOrderedForest(BaseEstimator):
         for class_idx in range(1, nclass, 1):
             train_multi_demeaned_0_first[
                 class_idx+1] = train_multi_demeaned[class_idx]
+
         # Create storage container
         honest_covariance = {}
         train_covariance = {}
@@ -1398,12 +1202,14 @@ class BaseOrderedForest(BaseEstimator):
         # train sample
         train_variance_first = {}
         train_variance_first[1] = np.zeros(train_variance[1].shape)
+
         # Shift existing matrices by 1 class
         for class_idx in range(1, nclass, 1):
             # honest sample
             honest_variance_first[class_idx+1] = honest_variance[class_idx]
             # train sample
             train_variance_first[class_idx+1] = train_variance[class_idx]
+
         # Create storage container
         honest_variance_final = np.empty((n_est, nclass))
         train_variance_final = np.empty((n_tr, nclass))
@@ -1421,6 +1227,7 @@ class BaseOrderedForest(BaseEstimator):
                     class_idx].reshape(-1, 1) + train_variance_first[
                     class_idx].reshape(-1, 1) - train_covariance[
                         class_idx].reshape(-1, 1)
+
         # put honest and train sample together
         variance_final = np.vstack((honest_variance_final,
                                     train_variance_final))
@@ -1428,13 +1235,16 @@ class BaseOrderedForest(BaseEstimator):
         ind_all = np.hstack((ind_est, ind_tr))
         # Sort variance_final according to indices in ind_all
         variance_final = variance_final[ind_all.argsort(), :]
-        # retunr final variance
+
+        # return final variance
         return variance_final
+
 
 # %% Out-of-class honesty and weight functions (for parallelization)
 # define function outside of the class for speedup of multiprocessing
 def _honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
     """Compute the honest leaf means using loop."""
+
     # create an empty array to save the leaf means
     leaf_means = np.empty(max_id)
     # loop over leaf indices
@@ -1446,11 +1256,14 @@ def _honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
             leaf_means[idx] = 0
         else:
             leaf_means[idx] = np.mean(outcome_ind_est[row_idx])
+
     return leaf_means
+
 
 @ray.remote
 def _honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
     """Compute the honest leaf means using numpy."""
+
     # create an empty array to save the leaf means
     leaf_means = np.zeros(max_id)
     # Create dummy matrix dim(n_est, max_id)
@@ -1462,12 +1275,14 @@ def _honest_fit_numpy_func_out(tree, forest_apply, outcome_ind_est, max_id):
     leaf_n = onehot.sum(axis=0)
     # Compute leaf means for each leaf
     leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+
     return leaf_means
 
 
 def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
                             n_est):
     """Compute the honest weights using numpy."""
+
     # extract vectors of leaf IDs
     leaf_IDs_honest = forest_apply[:, tree]
     leaf_IDs_all = forest_apply_all[:, tree]
@@ -1475,6 +1290,7 @@ def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
     # populated by observations from honest sample
     leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
     leaf_IDs_all_u = np.unique(leaf_IDs_all)
+
     if np.array_equal(leaf_IDs_honest_u, 
                       leaf_IDs_all_u):
         leaf_IDs_honest_ext = leaf_IDs_honest
@@ -1490,6 +1306,7 @@ def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
             leaf_IDs_honest_u, leaf_IDs_all_u)
         leaf_IDs_all_ext = np.append(
             leaf_IDs_all, extra_all)
+
     # Generate onehot matrices
     onehot_honest = OneHotEncoder(
         sparse=True).fit_transform(
@@ -1498,6 +1315,7 @@ def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
         sparse=True).fit_transform(
             leaf_IDs_all_ext.reshape(-1, 1))
     onehot_all = onehot_all[:n_samples,:]
+
     # Multiply matrices
     # (n, n_leafs)x(n_leafs, n_est)
     tree_out = onehot_all.dot(onehot_honest).todense()
@@ -1511,6 +1329,7 @@ def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
         tree_out = tree_out[:n_samples, :n_est]
     # Compute weights
     tree_out = tree_out/leaf_size
+
     return tree_out
 
 
