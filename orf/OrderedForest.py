@@ -203,8 +203,8 @@ class OrderedForest(BaseOrderedForest):
 
     # %% Margin function
     # function to evaluate marginal effects with estimated ordered forest
-    def margin(self, X=None, X_cat=None, eval_point="mean", window=0.1,
-               verbose=True):
+    def margin(self, X=None, X_cat=None, X_eval=None, eval_point="mean",
+               window=0.1, verbose=True):
         """
         OrderedRandomForest marginal effects.
 
@@ -219,6 +219,12 @@ class OrderedForest(BaseOrderedForest):
             i.e. X_cat=(1,) if the second column includes categorical values.
             If not defined, covariates with integer values and less than 10
             unique values are considered to be categorical as default.
+        X_eval : list or tuple or NoneType
+            List or tuple indicating the columns with covariates for which the,
+            marginal effect should be evaluated, i.e. X_eval=(1,) if the effect
+            for the covariate in the column should be evaluated. This can
+            significantly speed up the computations. If not defined,
+            all covariates are considered as default.
         eval_point: string
             Defining evaluation point for marginal effects. These
             can be one of "mean", "atmean", or "atmedian". Default is "mean".
@@ -239,7 +245,7 @@ class OrderedForest(BaseOrderedForest):
                  p-values, respectively.
         """
 
-        # Input checks
+        # %% Input checks
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])
 
@@ -266,10 +272,45 @@ class OrderedForest(BaseOrderedForest):
                                      "covariates must be less or equal "
                                      "than the overall number of covariates. "
                                      ", got %s" % len(X_cat))
+                # Check if max index is admissible
+                if not ((np.max(X_cat) <= (self.n_features - 1)) &
+                        (np.min(X_cat) >= 0)):
+                    # raise value error
+                    raise ValueError("Indices for categorical covariates "
+                                     "must be between 0 and the overall number"
+                                     " of covariates - 1, got %s" % len(X_cat))
             else:
                 # raise value error
                 raise ValueError("X_cat must be of type tuple, list or None"
                                  ", got %s" % X_cat)
+
+        # Check if X_eval defined properly
+        if not X_eval is None:
+            if isinstance(X_eval, (list, tuple)):
+                # Check if number of indices is admissible
+                if not len(X_eval) <= self.n_features:
+                    # raise value error
+                    raise ValueError("Number of indices for covariates "
+                                     "for which the marginal effects are "
+                                     "evaluated must be less or equal "
+                                     "than the overall number of covariates. "
+                                     ", got %s" % len(X_eval))
+                # Check if max index is admissible
+                if not ((np.max(X_eval) <= (self.n_features - 1)) &
+                        (np.min(X_eval) >= 0)):
+                    # raise value error
+                    raise ValueError("Indices for effect covariates must "
+                                     "be between 0 and the overall number of "
+                                     "covariates - 1, got %s" % len(X_eval))
+                # assign the indices
+                X_eval_ind = X_eval
+            else:
+                # raise value error
+                raise ValueError("X_eval must be of type tuple, list or None"
+                                 ", got %s" % X_eval)
+        else:
+            # select all covariates for margins evaluation
+            X_eval_ind = [*range(self.n_features)]
 
         # check whether to predict probabilities or classes
         if not isinstance(verbose, bool):
@@ -303,10 +344,8 @@ class OrderedForest(BaseOrderedForest):
 
         # get the indices of the honest sample
         ind_est = self.forest_['ind_est']
-        # get inference argument
-        inference = self.inference
 
-        ## Prepare data sets
+        # %% Prepare data sets
         # check if new data provided or not
         if X is None:
             # if no new data supplied, estimate in-sample marginal effects
@@ -357,120 +396,175 @@ class OrderedForest(BaseOrderedForest):
         # Save evaluation point(s) in X_mean
         if eval_point == "atmean":
             X_mean = np.mean(X_eval, axis=0).reshape(1,-1)
+            # adjust for dummies and categorical covariates
+            X_mean[:, X_dummy] = np.median(X_eval[:, X_dummy],
+                                           axis=0).reshape(1,-1)
+            X_mean[:, X_cat] = np.median(X_eval[:, X_cat],
+                                         axis=0).reshape(1,-1)
         elif eval_point == "atmedian":
             X_mean = np.median(X_eval, axis=0).reshape(1,-1)
         else:
             X_mean = X_eval.copy()
+
         # Get dimension of evaluation points
         X_rows = np.shape(X_mean)[0]
         X_cols = np.shape(X_mean)[1]
         # Get standard deviation of X_est in the same shape as X_mean
-        X_sd = np.repeat(np.std(X_est, axis=0, ddof=1).reshape(1,-1
-                                                               ),X_rows, axis=0)
-        # create X_up (X_mean + window * X_sd)
-        X_up = X_mean + window*X_sd
+        # X_est here as for X_eval it is not ensured that the std is not zero
+        # if the X_eval includes only 1 row
+        X_sd = np.repeat(np.std(
+            X_est, axis=0, ddof=1).reshape(1,-1), X_rows, axis=0)
+        # create X_up (X_mean + window * X_sd) only for selected covariates
+        X_up = X_mean.copy()
+        X_up[:, X_eval_ind] = X_mean[:, X_eval_ind]+window*X_sd[:, X_eval_ind]
         # create X_down (X_mean - window * X_sd)
-        X_down = X_mean - window*X_sd
+        X_down = X_mean.copy()
+        X_down[:, X_eval_ind] = X_mean[:, X_eval_ind]-window*X_sd[:, X_eval_ind]
 
         ## now check if support of X_eval is within X_est
         # check X_max
-        X_max = np.repeat(np.max(X_est, axis=0).reshape(1,-1),X_rows, axis=0)
+        X_max = np.repeat(np.max(X_est, axis=0).reshape(1,-1), X_rows, axis=0)
         # check X_min
-        X_min = np.repeat(np.min(X_est, axis=0).reshape(1,-1),X_rows, axis=0)
+        X_min = np.repeat(np.min(X_est, axis=0).reshape(1,-1), X_rows, axis=0)
         # check if X_up is within the range X_min and X_max
         # If some X_up is larger than the max in X_est, replace entry in X_up 
         # by this max value of X_est. If some X_up is smaller than the min in
         # X_est, replace entry in X_up by this min value + window * X_sd
-        X_up = (X_up < X_max) * X_up + (X_up >= X_max) * X_max
-        X_up = (X_up > X_min) * X_up + (X_up <= X_min) * (X_min + window * X_sd)
+        X_up[:, X_eval_ind] = (
+            (X_up[:, X_eval_ind] < X_max[:, X_eval_ind])*X_up[:, X_eval_ind]+ 
+            (X_up[:, X_eval_ind] >= X_max[:, X_eval_ind])*X_max[:, X_eval_ind]
+            )
+        X_up[:, X_eval_ind] = (
+            (X_up[:, X_eval_ind] > X_min[:, X_eval_ind])*X_up[:, X_eval_ind]+
+            (X_up[:, X_eval_ind] <= X_min[:, X_eval_ind])*
+            (X_min[:, X_eval_ind] + window * X_sd[:, X_eval_ind])
+            )
         # check if X_down is within the range X_min and X_max
-        X_down = (X_down > X_min) * X_down + (X_down <= X_min) * X_min
-        X_down = (X_down < X_max) * X_down + (X_down >= X_max) *(
-            X_max - window * X_sd)
-
-        # check if X_up and X_down are same
-        if (np.any(X_up == X_down)):
-            # adjust to higher share of SD
-            X_up = (X_up > X_down) * X_up + (X_up == X_down) * (
-                X_up + 0.5 * window * X_sd)
-            X_down = (X_up > X_down) * X_down + (X_up == X_down) * (
-                X_down - 0.5 * window * X_sd)
-            # check the min max range again
-            X_up = (X_up < X_max) * X_up + (X_up >= X_max) * X_max
-            X_down = (X_down > X_min) * X_down + (X_down <= X_min) * X_min
+        X_down[:, X_eval_ind] = (
+            (X_down[:, X_eval_ind]>X_min[:, X_eval_ind])*X_down[:, X_eval_ind]+
+            (X_down[:, X_eval_ind]<=X_min[:, X_eval_ind])*X_min[:, X_eval_ind]
+            )
+        X_down[:, X_eval_ind] = (
+            (X_down[:, X_eval_ind]<X_max[:, X_eval_ind])*X_down[:, X_eval_ind]+
+            (X_down[:, X_eval_ind]>=X_max[:, X_eval_ind])*
+            (X_max[:, X_eval_ind] - window * X_sd[:, X_eval_ind])
+            )
         
         # Adjust for dummies
-        X_up[:, X_dummy] = np.max(X_eval[:, X_dummy], axis=0)
-        X_down[:, X_dummy] = np.min(X_eval[:, X_dummy], axis=0)
+        X_up[:, np.intersect1d(X_dummy, X_eval_ind)] = np.max(
+            X_eval[:, np.intersect1d(X_dummy, X_eval_ind)], axis=0)
+        X_down[:, np.intersect1d(X_dummy, X_eval_ind)] = np.min(
+            X_eval[:, np.intersect1d(X_dummy, X_eval_ind)], axis=0)
         
         # Adjust for categorical variables
-        X_up[:, X_cat] = np.ceil(X_up[:, X_cat])
-        X_down[:, X_cat] = X_up[:, X_cat]-1
+        X_up[:, np.intersect1d(X_cat, X_eval_ind)] = np.ceil(
+            X_up[:, np.intersect1d(X_cat, X_eval_ind)])
+        X_down[:, np.intersect1d(X_cat, X_eval_ind)] = (
+            X_up[:, np.intersect1d(X_cat, X_eval_ind)]-1)
+
+        # check if X_up and X_down are same this should not happen at all
+        # increase the window size by 1% iteratively until no X_up==X_down
+        wider_window = window + 0.01
+        # start the while loop
+        while (np.any(X_up[:, X_eval_ind] == X_down[:, X_eval_ind])):
+            # adjust to higher share of SD
+            X_up[:, X_eval_ind] = (
+                (X_up[:, X_eval_ind]>X_down[:, X_eval_ind])*X_up[:, X_eval_ind]+
+                (X_up[:, X_eval_ind]==X_down[:, X_eval_ind])*
+                (X_up[:, X_eval_ind] + wider_window * X_sd[:, X_eval_ind])
+                )
+            # check the support (must be before X_down will be adjusted)
+            X_up[:, X_eval_ind] = (
+                (X_up[:, X_eval_ind]<X_max[:, X_eval_ind])*X_up[:, X_eval_ind]+
+                (X_up[:, X_eval_ind]>=X_max[:, X_eval_ind])*X_max[:, X_eval_ind]
+                )
+            # adjust to higher share of SD
+            X_down[:, X_eval_ind] = (
+                (X_up[:, X_eval_ind] > X_down[:, X_eval_ind]) *
+                X_down[:, X_eval_ind] +
+                (X_up[:, X_eval_ind] == X_down[:, X_eval_ind]) *
+                (X_down[:, X_eval_ind] - wider_window * X_sd[:, X_eval_ind])
+                )
+            # check the support
+            X_down[:, X_eval_ind] = (
+                (X_down[:, X_eval_ind] > X_min[:, X_eval_ind]) *
+                X_down[:, X_eval_ind] +
+                (X_down[:, X_eval_ind] <= X_min[:, X_eval_ind]) *
+                X_min[:, X_eval_ind]
+                )
+            # increase window size by 1%
+            wider_window = wider_window + 0.01
+            # check if the new window size is admissible
+            if wider_window > 1:
+                # break here
+                break
         
         ## Compute predictions
         # Create storage arrays to save predictions
-        forest_pred_up = np.empty((X_cols, self.n_class-1))
-        forest_pred_down = np.empty((X_cols, self.n_class-1))
+        forest_pred_up = np.empty((len(X_eval_ind), self.n_class-1))
+        forest_pred_down = np.empty((len(X_eval_ind), self.n_class-1))
 
         # Case 1: No honesty (= no inference)
         if not self.honesty:
-            # loop over all covariates
-            for x_id in range(X_cols):
+            # loop over evaluation covariates
+            for x_id, x_pos in zip(X_eval_ind, range(len(X_eval_ind))):
                 # Prepare input matrix where column x_id is adjusted upwards
-                X_mean_up = X_eval.copy()
+                X_mean_up = X_mean.copy()
                 X_mean_up[:,x_id] = X_up[:,x_id]
                 # Compute mean predictions (only needed for eval_point=mean
                 # but no change im atmean or atmedian)
-                forest_pred_up[x_id,:] = np.mean(self._predict_default(
+                forest_pred_up[x_pos,:] = np.mean(self._predict_default(
                     X=X_mean_up, n_samples=n_samples), axis=0)
                 # Prepare input matrix where column x_id is adjusted downwards
-                X_mean_down = X_eval.copy()
+                X_mean_down = X_mean.copy()
                 X_mean_down[:,x_id] = X_down[:,x_id]
                 # Compute mean predictions
-                forest_pred_down[x_id,:] = np.mean(self._predict_default(
+                forest_pred_down[x_pos,:] = np.mean(self._predict_default(
                     X=X_mean_down, n_samples=n_samples), axis=0)
 
-        if self.honesty and not inference:
-            # loop over all covariates
-            for x_id in range(X_cols):
+        # Case 2: honesty but no inference
+        if self.honesty and not self.inference:
+            # loop over evaluation covariates
+            for x_id, x_pos in zip(X_eval_ind, range(len(X_eval_ind))):
                 # Prepare input matrix where column x_id is adjusted upwards
-                X_mean_up = X_eval.copy()
+                X_mean_up = X_mean.copy()
                 X_mean_up[:,x_id] = X_up[:,x_id]
                 # Compute mean predictions (only needed for eval_point=mean
                 # but no change im atmean or atmedian)
-                forest_pred_up[x_id,:] = np.mean(self._predict_leafmeans(
+                forest_pred_up[x_pos,:] = np.mean(self._predict_leafmeans(
                     X=X_mean_up, n_samples=n_samples), axis=0)
                 # Prepare input matrix where column x_id is adjusted downwards
-                X_mean_down = X_eval.copy()
+                X_mean_down = X_mean.copy()
                 X_mean_down[:,x_id] = X_down[:,x_id]
                 # Compute mean predictions
-                forest_pred_down[x_id,:] = np.mean(self._predict_leafmeans(
+                forest_pred_down[x_pos,:] = np.mean(self._predict_leafmeans(
                     X=X_mean_down, n_samples=n_samples), axis=0)
 
-        if self.honesty and inference:
+        # Case 3: honesty and inference
+        if self.honesty and self.inference:
             # storage container for weight matrices
             forest_weights_up={}
             forest_weights_down={}
-            # loop over all covariates
-            for x_id in range(X_cols):
+            # loop over evaluation covariates
+            for x_id, x_pos in zip(X_eval_ind, range(len(X_eval_ind))):
                 # Prepare input matrix where column x_id is adjusted upwards
-                X_mean_up = X_eval.copy()
+                X_mean_up = X_mean.copy()
                 X_mean_up[:,x_id] = X_up[:,x_id]
                 # Compute predictions and weights matrix
                 forest_pred_up_x_id, forest_weights_up[x_id] = (
                     self._predict_weights(X=X_mean_up, n_samples=n_samples))
                 # Compute mean predictions (only needed for eval_point=mean
                 # but no change im atmean or atmedian)
-                forest_pred_up[x_id,:] = np.mean(forest_pred_up_x_id, axis=0)
+                forest_pred_up[x_pos,:] = np.mean(forest_pred_up_x_id, axis=0)
                 # Prepare input matrix where column x_id is adjusted downwards
-                X_mean_down = X_eval.copy()
+                X_mean_down = X_mean.copy()
                 X_mean_down[:,x_id] = X_down[:,x_id]
                 # Compute predictions and weights matrix
                 forest_pred_down_x_id, forest_weights_down[x_id] = (
                     self._predict_weights(X=X_mean_down, n_samples=n_samples))
                 # Compute mean predictions (only needed for eval_point=mean
                 # but no change im atmean or atmedian)
-                forest_pred_down[x_id,:] = np.mean(
+                forest_pred_down[x_pos,:] = np.mean(
                     forest_pred_down_x_id, axis=0)
 
             # Compute means of weights
@@ -484,9 +578,11 @@ class OrderedForest(BaseOrderedForest):
         # ORF predictions for forest_pred_up
         # create 2 distinct matrices with zeros and ones for easy subtraction
         # prepend vector of zeros
-        forest_pred_up_0 = np.hstack((np.zeros((X_cols, 1)), forest_pred_up))
+        forest_pred_up_0 = np.hstack((np.zeros((len(X_eval_ind), 1)),
+                                      forest_pred_up))
         # postpend vector of ones
-        forest_pred_up_1 = np.hstack((forest_pred_up, np.ones((X_cols, 1))))
+        forest_pred_up_1 = np.hstack((forest_pred_up,
+                                      np.ones((len(X_eval_ind), 1))))
         # difference out the adjacent categories to singleout the class probs
         forest_pred_up = forest_pred_up_1 - forest_pred_up_0
         # check if some probabilities become negative and set them to zero
@@ -498,11 +594,11 @@ class OrderedForest(BaseOrderedForest):
         # ORF predictions for forest_pred_down
         # create 2 distinct matrices with zeros and ones for easy subtraction
         # prepend vector of zeros
-        forest_pred_down_0 = np.hstack((np.zeros((X_cols, 1)),
+        forest_pred_down_0 = np.hstack((np.zeros((len(X_eval_ind), 1)),
                                         forest_pred_down))
         # postpend vector of ones
         forest_pred_down_1 = np.hstack((forest_pred_down,
-                                        np.ones((X_cols, 1))))
+                                        np.ones((len(X_eval_ind), 1))))
         # difference out the adjacent categories to singleout the class probs
         forest_pred_down = forest_pred_down_1 - forest_pred_down_0
         # check if some probabilities become negative and set them to zero
@@ -515,17 +611,19 @@ class OrderedForest(BaseOrderedForest):
         # compute difference between up and down (numerator)
         forest_pred_diff_up_down = forest_pred_up - forest_pred_down
         # compute scaling factor (denominator)
-        scaling_factor = np.mean(X_up - X_down, axis=0).reshape(-1,1)
+        scaling_factor = np.mean(X_up[:, X_eval_ind] - X_down[:, X_eval_ind],
+                                 axis=0).reshape(-1,1)
         # Set scaling factor to 1 for categorical and dummy variables
-        scaling_factor[X_dummy,:] = 1
-        scaling_factor[X_cat,:] = 1
+        # this should be either way the case
+        # scaling_factor[np.intersect1d(X_dummy, X_eval_ind), :] = 1
+        # scaling_factor[np.intersect1d(X_cat, X_eval_ind), :] = 1
         # Scale the differences to get the marginal effects
         marginal_effects_scaled = forest_pred_diff_up_down / scaling_factor
         
         # redefine all effect results as floats
         margins = marginal_effects_scaled.astype(float)
         
-        if inference:
+        if self.inference:
             ## variance for the marginal effects
             # compute prerequisities for variance of honest marginal effects
             # squared scaling factor
@@ -533,10 +631,10 @@ class OrderedForest(BaseOrderedForest):
             # Get the size of the honest sample
             n_est = len(ind_est)
             # Create storage container for variance
-            variance_me = np.empty((X_cols, self.n_class))
+            variance_me = np.empty((len(X_eval_ind), self.n_class))
 
-            # loop over all covariates
-            for x_id in range(X_cols):
+            # loop over selected covariates
+            for x_id, x_pos in zip(X_eval_ind, range(len(X_eval_ind))):
                 # Generate sub-dictionary
                 # Create storage containers
                 forest_multi_demeaned = {}
@@ -576,7 +674,7 @@ class OrderedForest(BaseOrderedForest):
                     # divide by scaling factor to get the variance
                     variance[class_idx] = (
                         forest_multi_demeaned_sq_sum_norm/
-                                scaling_factor_squared[x_id])
+                                scaling_factor_squared[x_pos])
 
                 # ### Covariance computation:
                 # Shift categories for computational convenience
@@ -610,7 +708,7 @@ class OrderedForest(BaseOrderedForest):
                     # divide by scaling factor to get the covariance
                     covariance[class_idx] = (
                         forest_multi_demeaned_cov_sum_norm_mult2/
-                        scaling_factor_squared[x_id])
+                        scaling_factor_squared[x_pos])
 
                 # ### Put everything together
                 # Shift categories for computational convenience
@@ -626,7 +724,7 @@ class OrderedForest(BaseOrderedForest):
                     variance_first[class_idx+1] = variance[class_idx]
                 # Compute final variance according to: var_last+var_first-cov
                 for class_idx in range(1, self.n_class+1, 1):
-                    variance_me[x_id,class_idx-1]  = variance_last[
+                    variance_me[x_pos, class_idx-1]  = variance_last[
                             class_idx].reshape(-1, 1) + variance_first[
                             class_idx].reshape(-1, 1) - covariance[
                                 class_idx].reshape(-1, 1)
@@ -657,11 +755,11 @@ class OrderedForest(BaseOrderedForest):
 
         # check if marginal effects should be printed
         if verbose:
-            string_seq_X = [str(x) for x in np.arange(1,X_cols+1)]
+            string_seq_X = [str(x) for x in X_eval_ind]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
 
             # print marginal effects nicely
-            if not inference:
+            if not self.inference:
                 print('-' * 70,
                       'Marginal Effects of OrderedRandomForest, evaluation point: '+ 
                       eval_point, '-' * 70, 'Effects:', '-' * 70,
