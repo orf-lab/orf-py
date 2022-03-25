@@ -11,13 +11,13 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 - representative test file to compare with R for big data (G)
 - simplify the categorical variable condition in R package to ensure difference of exactly 1 as in Python (G)
 - check time comparisons for parallelisation (G)
-- replace mse2 with ranked probability score (G)
 - check in R if atmean is handled as atmedian for categorical and ummy variables (G)
 - code deadline: 25.3.2022
 - documentation deadline: 1.4.2022
 
 ## Done:
 
+- replace mse2 with ranked probability score (G)
 - add optional argument to compute marginal effects only for certain variables (G)
 - implement while loop for marginal effects if window too small to yield different x_up and x_down (G)
 - check how to handle categorical variables (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)

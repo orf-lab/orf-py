@@ -907,10 +907,10 @@ class OrderedForest(BaseOrderedForest):
             print('%-18s%-15s' % ('trainsize:', len(self.forest_['ind_tr'])))
             print('%-18s%-15s' % ('honestsize:', len(self.forest_['ind_est'])))
             print('%-18s%-15s' % ('features:', self.n_features))
-            print('%-18s%-15s' % ('mse1:',np.round(
-                float(self.measures['mse 1']),3)))
-            print('%-18s%-15s' % ('mse2:',np.round(
-                float(self.measures['mse 2']),3)))
+            print('%-18s%-15s' % ('mse:',np.round(
+                float(self.measures['mse']),3)))
+            print('%-18s%-15s' % ('rps:',np.round(
+                float(self.measures['rps']),3)))
             print('%-18s%-15s' % ('accuracy:',np.round(
                 float(self.measures['accuracy']),3)))
             print('-' * 50)
@@ -1048,7 +1048,7 @@ class OrderedForest(BaseOrderedForest):
     # performance measures (public method, available to user)
     def performance(self):
         """
-        Print the prediction performance based on MSE and CA.
+        Print the prediction performance based on MSE, RPS and CA.
 
         Parameters
         ----------
@@ -1056,7 +1056,7 @@ class OrderedForest(BaseOrderedForest):
 
         Returns
         -------
-        None. Prints MSE, Classification accuracy and confusion matrix.
+        None. Prints MSE, RPS, Classification accuracy and confusion matrix.
         """
 
         # Input checks

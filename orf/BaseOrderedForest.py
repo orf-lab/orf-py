@@ -295,7 +295,7 @@ class BaseOrderedForest(BaseEstimator):
         # Use sklearn input checks to allow for multiple types of inputs:
         # - returns numpy arrays for X and y (no matter which input type)
         # - forces y to be numeric
-        X,y = check_X_y(X,y, y_numeric=True, estimator="OrderedRandomForest")
+        X,y = check_X_y(X, y, y_numeric=True, estimator="OrderedRandomForest")
         # Get vector of sorted unique values of y
         y_values = np.unique(y)
 
@@ -813,8 +813,10 @@ class BaseOrderedForest(BaseEstimator):
                         'ind_tr': ind_tr,
                         'ind_est': ind_est,
                         'weights': weights}
+
         # compute prediction performance
         self._performance(y, y_values)
+
         # return the output
         return self
 
@@ -823,7 +825,7 @@ class BaseOrderedForest(BaseEstimator):
     # performance measures (private method, not available to user)
     def _performance(self, y, y_values):
         """
-        Evaluate the prediction performance using MSE and CA.
+        Evaluate the prediction performance using MSE, RPS and CA.
 
         Parameters
         ----------
@@ -832,29 +834,36 @@ class BaseOrderedForest(BaseEstimator):
 
         Returns
         -------
-        None. Calculates MSE, Classification accuracy and confusion matrix.
+        None. Calculates MSE, RPS, Classification accuracy, confusion matrix.
         """
 
         # take over needed values
         predictions = self.forest_['probs']
 
-        # compute the mse: version 1
+        # compute the mse
         # create storage empty dataframe
         mse_matrix = np.zeros(predictions.shape)
         # allocate indicators for true outcome and leave zeros for the others
         # minus 1 for the column index as indices start with 0, outcomes with 1
-        mse_matrix[np.arange(y.shape[0]),y-1] = 1
-        # compute mse directly now by substracting two dataframes and rowsums
-        mse_1 = np.mean(((mse_matrix - predictions) ** 2).sum(axis=1))
+        mse_matrix[np.arange(y.shape[0]), y-1] = 1
 
-        # compute the mse: version 2
-        # create storage for modified predictions
-        modified_pred = np.zeros(y.shape[0])
-        # modify the predictions with 1*P(1)+2*P(2)+3*P(3) as an alternative
-        modified_pred = np.dot(predictions, np.arange(
-            start=1, stop=predictions.shape[1]+1))
-        # Compute MSE
-        mse_2 = np.mean((y - modified_pred) ** 2)
+        # compute mse directly now by substracting two dataframes and rowsums
+        mse = np.mean(((mse_matrix - predictions) ** 2).sum(axis=1))
+
+        # compute rps (ranked probabilty score)
+        # get the indicator matrix (same as for mse)
+        rps_matrix = mse_matrix.copy()
+        # prepare storage for cumulative scores
+        cum = np.zeros(len(y))
+        # loop over the categories (inspired by and thanks to:
+        # https://opisthokonta.net/?p=1333)
+        for i in y_values:
+            # update the cumulative score
+            cum = (cum + (np.sum(predictions[:, 0:i], axis=1) -
+                         np.sum(rps_matrix[:, 0:i], axis=1))**2
+                   )
+        # compute the RPS
+        rps = np.mean((1/(len(y_values)-1))*cum)
 
         # compute classification accuracy
         # define classes with highest probability (+1 as index starts with 0)
@@ -874,8 +883,8 @@ class BaseOrderedForest(BaseEstimator):
                                       index=labels, columns=labels)
 
         # wrap the results into a dataframe
-        self.measures = pd.DataFrame({'mse 1': mse_1, 'mse 2': mse_2,
-                                      'accuracy': acc}, index=['value'])
+        self.measures = pd.DataFrame({'mse': mse, 'rps': rps, 'accuracy': acc},
+                                     index=['value'])
 
         # empty return
         return None
