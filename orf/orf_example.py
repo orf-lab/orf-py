@@ -33,8 +33,9 @@ np.random.seed(999)
 oforest = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
                               max_features=0.3, replace=False,
                               sample_fraction=0.5, honesty=True,
-                              n_jobs=-1, pred_method='numpy_loop',
-                              weight_method='numpy_loop', inference=True)
+                              n_jobs=-1, pred_method='numpy_loop_multi',
+                              weight_method='numpy_loop_conquer',
+                              inference=True)
 # fit the model
 oforest.fit(X=features, y=outcome)
 # print summary of estimation
