@@ -138,7 +138,7 @@ timing_pred.to_csv(path+'/orf/timing/'+opsystem+'_timing_pred_method.csv')
 # %% Benchmark 2: Parallelisation for the .fit() with honesty and inference
 # define loop values
 sample_sizes = [100, 200]
-weight_methods = ['numpy_loop', 'numpy_loop_multi', 'numpy_loop_shared_mpire',
+weight_methods = ['numpy_loop', 'numpy_loop_shared_mpire',
                   'numpy_loop_shared_joblib', 'numpy_loop_conquer']
 core_sizes = [1, 10]
 reps = 3

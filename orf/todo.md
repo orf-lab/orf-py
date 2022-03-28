@@ -7,6 +7,13 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 - decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F)
 - representative test file to compare with R for big data (G)
 - simplify weight method 'numpy_loop' via calling '_honest_weight_numpy' function directly (G)
+- run code analysis and adjust accordingly (G)
+- complete documentation based on R package (G)
+- API reference in Python (F)
+- add examples to docstrings and check attributes vs. returns (F)
+- change to: BaseOrderedForest, OrderedRandomForest, OrderedForest
+- PyPi package name: orf
+- decide on GitHub structure (own repo vs. organisation for released version) (F, G)
 
 - check how to handle categorical variables in R (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)
 - implement while loop in R for marginal effects if window too small to yield different x_up and x_down (G)

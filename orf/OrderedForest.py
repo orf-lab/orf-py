@@ -216,14 +216,15 @@ class OrderedForest(BaseOrderedForest):
             the same number of features as the X in the fit function.
         X_cat : list or tuple or NoneType
             List or tuple indicating the columns with categorical covariates,
-            i.e. X_cat=(1,) if the second column includes categorical values.
-            If not defined, covariates with integer values and less than 10
-            unique values are considered to be categorical as default.
+            i.e. X_cat=(1,) or X_cat=[1] if the second column includes
+            categorical values. If not defined, covariates with integer values
+            and less than 10 unique values are considered to be categorical as
+            default.
         X_eval : list or tuple or NoneType
             List or tuple indicating the columns with covariates for which the,
-            marginal effect should be evaluated, i.e. X_eval=(1,) if the effect
-            for the covariate in the column should be evaluated. This can
-            significantly speed up the computations. If not defined,
+            marginal effect should be evaluated, i.e. X_eval=(1,) or X_eval=[1]
+            if the effect for the covariate in the column should be evaluated.
+            This can significantly speed up the computations. If not defined,
             all covariates are considered as default.
         eval_point: string
             Defining evaluation point for marginal effects. These
@@ -233,7 +234,6 @@ class OrderedForest(BaseOrderedForest):
             evaluation of the marginal effect. Default is 0.1.
         verbose : bool
             Should the results printed to console? Default is True.
-            
 
         Returns
         -------
