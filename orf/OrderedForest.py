@@ -36,7 +36,7 @@ class OrderedForest(BaseOrderedForest):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_loop_mpire',
+                 pred_method='numpy_mpire',
                  weight_method='numpy_loop_shared_mpire',
                  random_state=None):
         # access inherited methods

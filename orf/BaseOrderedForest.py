@@ -23,10 +23,11 @@ from sklearn.utils import check_random_state, check_X_y
 from sklearn.utils.validation import _num_samples, _num_features
 from econml.grf import RegressionForest
 from joblib import Parallel, delayed, parallel_backend
-from multiprocessing import Pool, cpu_count, Lock
+from multiprocessing import Pool, cpu_count, Lock, shared_memory
 from mpire import WorkerPool
 from functools import partial
 
+_lock = Lock()  # initiate lock
 
 # %% Class definition
     
@@ -48,7 +49,7 @@ class BaseOrderedForest(BaseEstimator):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_loop_mpire',
+                 pred_method='numpy_mpire',
                  weight_method='numpy_loop_shared_mpire',
                  random_state=None):
 
@@ -231,9 +232,9 @@ class BaseOrderedForest(BaseEstimator):
                 or pred_method == 'loop'
                 or pred_method == 'loop_multi'
                 or pred_method == 'numpy'
-                or pred_method == 'numpy_loop'
-                or pred_method == 'numpy_loop_multi'
-                or pred_method == 'numpy_loop_mpire'
+                or pred_method == 'numpy_joblib'
+                or pred_method == 'numpy_multi'
+                or pred_method == 'numpy_mpire'
                 or pred_method == 'numpy_sparse'
                 or pred_method == 'numpy_sparse2'
                 or pred_method == 'numpy_loop_ray'):
@@ -255,7 +256,10 @@ class BaseOrderedForest(BaseEstimator):
                 or weight_method == 'numpy_loop_shared_multi'
                 or weight_method == 'numpy_loop_multi'
                 or weight_method == 'numpy_loop_shared_joblib'
-                or weight_method == 'numpy_loop_conquer'):
+                or weight_method == 'numpy_loop_conquer'
+                or weight_method == 'numpy_loop_joblib_conquer'
+                or weight_method == 'numpy_loop_mpire_conquer'
+                or weight_method == 'numpy_loop_joblib'):
             # assign the input value
             self.weight_method = weight_method
         else:
@@ -481,21 +485,26 @@ class BaseOrderedForest(BaseEstimator):
                                 n_jobs=self.n_jobs,
                                 n_estimators=self.n_estimators))
 
-                        # try joblib shared parallel
+                        # try joblib shared parallel     
                         if self.weight_method == 'numpy_loop_shared_joblib':
                             # create the shared object of forest weights dim
                             forest_out = np.zeros((n_samples, n_est))
-                            # Loop over trees in parallel
-                            forest_par = Parallel(n_jobs=self.n_jobs,
-                                                  require='sharedmem')(
-                                delayed(_forest_weights_joblib)(
-                                    tree=tree,
-                                    forest_apply=forest_apply,
-                                    forest_apply_all=forest_apply_all,
-                                    n_samples=n_samples,
-                                    n_est=n_est,
-                                    shared_object=forest_out)
-                                for tree in range(0, self.n_estimators))
+                            # _lock = Lock()  # initiate lock
+                            # parallel in shared memory
+                            Parallel(
+                                n_jobs=self.n_jobs,
+                                backend="threading"
+                                #require='sharedmem'
+                                )(delayed(
+                                    self._forest_weights_shared)(
+                                        tree=tree,
+                                        forest_apply=forest_apply,
+                                        forest_apply_all=forest_apply_all,
+                                        n_samples=n_samples,
+                                        n_est=n_est,
+                                        shared_object=forest_out,
+                                        lock=_lock)
+                                        for tree in range(self.n_estimators))
 
                         # use pure multiprocessing 
                         if self.weight_method == 'numpy_loop_multi':
@@ -559,51 +568,104 @@ class BaseOrderedForest(BaseEstimator):
                             forest_out = np.zeros((n_samples, n_est))
                             # Loop over trees
                             for tree in range(self.n_estimators):
-                                # extract vectors of leaf IDs
-                                leaf_IDs_honest = forest_apply[:, tree]
-                                leaf_IDs_all = forest_apply_all[:, tree]
-                                # Take care of cases where not all train leafs
-                                # populated by observations from honest sample
-                                leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
-                                leaf_IDs_all_u = np.unique(leaf_IDs_all)
-                                if np.array_equal(leaf_IDs_honest_u, 
-                                                  leaf_IDs_all_u):
-                                    leaf_IDs_honest_ext = leaf_IDs_honest
-                                    leaf_IDs_all_ext = leaf_IDs_all
-                                else:
-                                    # Find leaf IDs in all that are not in honest
-                                    extra_honest = np.setdiff1d(
-                                        leaf_IDs_all_u, leaf_IDs_honest_u)
-                                    leaf_IDs_honest_ext = np.append(
-                                        leaf_IDs_honest, extra_honest)
-                                    # Find leaf IDs in honest that are not in all
-                                    extra_all = np.setdiff1d(
-                                        leaf_IDs_honest_u, leaf_IDs_all_u)
-                                    leaf_IDs_all_ext = np.append(
-                                        leaf_IDs_all, extra_all)
-                                # Generate onehot matrices
-                                onehot_honest = OneHotEncoder(
-                                    sparse=True).fit_transform(
-                                        leaf_IDs_honest_ext.reshape(-1, 1)).T
-                                onehot_all = OneHotEncoder(
-                                    sparse=True).fit_transform(
-                                        leaf_IDs_all_ext.reshape(-1, 1))
-                                onehot_all = onehot_all[:n_samples,:]
-                                # Multiply matrices
-                                # (n, n_leafs)x(n_leafs, n_est)
-                                tree_out = onehot_all.dot(onehot_honest).todense()
-                                # Get leaf sizes
-                                # leaf size only for honest sample !!!
-                                leaf_size = tree_out.sum(axis=1)
-                                # Delete extra observations for unpopulated
-                                # honest leaves
-                                if not np.array_equal(
-                                        leaf_IDs_honest_u, leaf_IDs_all_u):
-                                    tree_out = tree_out[:n_samples, :n_est]
-                                # Compute weights
-                                tree_out = tree_out/leaf_size
+                                # get honest tree weights
+                                tree_out = self._honest_weight_numpy(
+                                    tree=tree,
+                                    forest_apply=forest_apply,
+                                    forest_apply_all=forest_apply_all,
+                                    n_samples=n_samples,
+                                    n_est=n_est)
                                 # add tree weights to overall forest weights
-                                forest_out = forest_out + tree_out
+                                forest_out += tree_out
+
+                        if self.weight_method == 'numpy_loop_joblib':
+                            # generate storage matrix for weights
+                            forest_out = sum(
+                                Parallel(n_jobs=self.n_jobs,
+                                         backend='threading')(delayed(
+                                             self._honest_weight_numpy)(
+                                                 tree=tree,
+                                                 forest_apply=forest_apply,
+                                                 forest_apply_all=forest_apply_all,
+                                                 n_samples=n_samples,
+                                                 n_est=n_est) for tree in range(self.n_estimators)))
+
+                        if self.weight_method == 'numpy_loop_joblib_conquer':
+                            # depending on number of cores divide the loops
+                            effective_jobs = self.n_jobs
+                            while (np.mod(
+                                    self.n_estimators, effective_jobs) != 0):
+                                # decrease number of cores to use
+                                effective_jobs = effective_jobs - 1
+                                # break if effective_jobs are equal to 1
+                                if (effective_jobs == 1):
+                                    break
+                            # use parralel to do effective jobs in chunks
+                            n_chunks = int(self.n_estimators/effective_jobs)
+                            chunk_range = np.arange(self.n_estimators)
+                            start_tree = 0
+                            stop_tree = effective_jobs
+                            # create the shared object of forest weights dim
+                            forest_out = np.zeros((n_samples, n_est))
+                            # serialize chunks in a loop
+                            for tree_chunk in range(n_chunks):
+                                # generate storage matrix for weights
+                                tree_chunk_out = sum(
+                                    Parallel(n_jobs=effective_jobs,
+                                             backend='threading')(delayed(
+                                                 self._honest_weight_numpy)(
+                                                     tree=tree,
+                                                     forest_apply=forest_apply,
+                                                     forest_apply_all=forest_apply_all,
+                                                     n_samples=n_samples,
+                                                     n_est=n_est) for tree in chunk_range[start_tree:stop_tree]))
+                                # adjust start and stop trees
+                                start_tree += effective_jobs
+                                stop_tree += effective_jobs
+                                # sum up all tree weights
+                                forest_out += tree_chunk_out
+
+                        if self.weight_method == 'numpy_loop_mpire_conquer':
+                            # depending on number of cores divide the loops
+                            effective_jobs = self.n_jobs
+                            while (np.mod(
+                                    self.n_estimators, effective_jobs) != 0):
+                                # decrease number of cores to use
+                                effective_jobs = effective_jobs - 1
+                                # break if effective_jobs are equal to 1
+                                if (effective_jobs == 1):
+                                    break
+                            # use parralel to do effective jobs in chunks
+                            n_chunks = int(self.n_estimators/effective_jobs)
+                            chunk_range = np.arange(self.n_estimators)
+                            start_tree = 0
+                            stop_tree = effective_jobs
+                            # create the shared object of forest weights dim
+                            forest_out = np.zeros((n_samples, n_est))
+                            # serialize chunks in a loop
+                            for tree_chunk in range(n_chunks):
+                                # define partial function by fixing parameters
+                                partial_fun = partial(
+                                    _honest_weight_numpy_out,
+                                    forest_apply=forest_apply,
+                                    forest_apply_all=forest_apply_all,
+                                    n_samples=n_samples,
+                                    n_est=n_est)
+                                # set up the worker pool for parallelization
+                                pool = WorkerPool(n_jobs=effective_jobs)
+                                # loop over trees in parallel
+                                tree_chunk_out = pool.map(
+                                    partial_fun, chunk_range[start_tree:stop_tree],
+                                    progress_bar=False,
+                                    concatenate_numpy_output=False)
+                                # stop and join pool
+                                pool.stop_and_join()
+                                # adjust start and stop trees
+                                start_tree += effective_jobs
+                                stop_tree += effective_jobs
+                                # sum up all tree weights
+                                forest_out += sum(tree_chunk_out)
+                            pool.stop_and_join()
 
                         # Divide by the number of trees to obtain final weights
                         forest_out = forest_out / self.n_estimators
@@ -634,7 +696,7 @@ class BaseOrderedForest(BaseEstimator):
                             # Loop over trees
                             leaf_means = Parallel(
                                 n_jobs=self.n_jobs,
-                                backend="loky")(
+                                backend="threading")(
                                     delayed(self._honest_fit_func)(
                                         tree=tree,
                                         forest_apply=forest_apply,
@@ -739,7 +801,7 @@ class BaseOrderedForest(BaseEstimator):
                             # assign the honest predictions, i.e. fitted values
                             fitted[class_idx] = leaf_means
                             
-                        if self.pred_method == 'numpy_loop':
+                        if self.pred_method == 'numpy_joblib':
                             # Loop over trees
                             with parallel_backend('threading',
                                                   n_jobs=self.n_jobs):
@@ -766,7 +828,7 @@ class BaseOrderedForest(BaseEstimator):
                             fitted[class_idx] = np.vstack(leaf_means).T
 
                         # Check whether to use multiprocessing or not
-                        if self.pred_method == 'numpy_loop_multi':
+                        if self.pred_method == 'numpy_multi':
                             # setup the pool for multiprocessing
                             pool = Pool(self.n_jobs)
                             # prepare iterables (need to replicate fixed items)
@@ -782,7 +844,7 @@ class BaseOrderedForest(BaseEstimator):
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
 
-                        if self.pred_method == 'numpy_loop_mpire':
+                        if self.pred_method == 'numpy_mpire':
                             # define partial function by fixing parameters
                             partial_fun = partial(
                                 self._honest_fit_numpy_func,
@@ -1304,6 +1366,18 @@ class BaseOrderedForest(BaseEstimator):
         return variance_final
 
 
+    # using shared memory
+    def _forest_weights_shared(self, tree, forest_apply, forest_apply_all,
+                               n_samples, n_est, shared_object, lock):
+        lock.acquire()
+        # perform the parallel task
+        shared_object += self._honest_weight_numpy(tree, forest_apply,
+                                                   forest_apply_all, n_samples,
+                                                   n_est)
+        lock.release()
+        return
+
+
 # %% Out-of-class honesty and weight functions (for parallelization)
 # define function outside of the class for speedup of multiprocessing
 def _honest_fit_func_out(tree, forest_apply, outcome_ind_est, max_id):
@@ -1416,7 +1490,7 @@ def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
 
 
 # multiprocessing with shared memory
-_lock = Lock()  # initiate lock
+# _lock = Lock()  # initiate lock
 
 
 # define tree weight function in shared memory
@@ -1461,3 +1535,15 @@ def _forest_weights_joblib(tree, forest_apply, forest_apply_all, n_samples,
     shared_object += tree_out  # update the shared object with tree weights
     # return the shared object
     return shared_object
+
+# using shared memory
+def _forest_weights_shared(tree, forest_apply, forest_apply_all, n_samples,
+                           n_est, shared_object, lock):
+    # lock.acquire()
+    # perform the parallel task
+    shared_object += _honest_weight_numpy_out(tree, forest_apply,
+                                               forest_apply_all, n_samples,
+                                               n_est)
+    # lock.release()
+    return
+

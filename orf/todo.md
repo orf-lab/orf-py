@@ -6,7 +6,6 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 - decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F)
 - representative test file to compare with R for big data (G)
-- simplify weight method 'numpy_loop' via calling '_honest_weight_numpy' function directly (G)
 - run code analysis and adjust accordingly (G)
 - complete documentation based on R package (G)
 - API reference in Python (F)
@@ -26,6 +25,7 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Done:
 
+- simplify weight method 'numpy_loop' via calling '_honest_weight_numpy' function directly (G)
 - check time comparisons for parallelisation (G)
 - replace mse2 with ranked probability score (G)
 - add optional argument to compute marginal effects only for certain variables (G)

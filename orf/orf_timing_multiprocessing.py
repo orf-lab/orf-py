@@ -79,11 +79,10 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
 
 # %% Benchmark 1: Parallelisation for the .fit() with honesty, no inference
 # define loop values
-sample_sizes = [100, 200]
-pred_methods = ['numpy', 'numpy_sparse', 'numpy_sparse2', 'numpy_loop',
-                'numpy_loop_multi', 'numpy_loop_mpire', 'numpy_loop_ray',
-                'loop', 'loop_multi']
-core_sizes = [1, 10]
+sample_sizes = [1000, 5000, 20000]
+pred_methods = ['loop', 'numpy', 'numpy_sparse', 'numpy_sparse2',
+                'numpy_joblib', 'numpy_mpire']
+core_sizes = [1, 4, 10]
 reps = 3
 
 # define storage for results
@@ -96,7 +95,7 @@ for n_sample in sample_sizes:
                                      cat_cat=3)
 
     # Forest: EconML (only with half size of dataset as we do not use honesty)
-    econml = RegressionForest(n_estimators=12, min_samples_leaf=5,
+    econml = RegressionForest(n_estimators=1000, min_samples_leaf=5,
                               max_features=0.3, max_samples=0.5,
                               honest=False)
     # estimate and time it (2* due to 2 categories in the outcome)
@@ -112,7 +111,7 @@ for n_sample in sample_sizes:
         for method_idx in pred_methods:
             print(method_idx)
             # define the ordered forest
-            orf = OrderedRandomForest(n_estimators=10, min_samples_leaf=5,
+            orf = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
                                       max_features=0.3, replace=False,
                                       sample_fraction=0.5, honesty=True,
                                       n_jobs=n_core, pred_method=method_idx,
@@ -137,10 +136,10 @@ timing_pred.to_csv(path+'/orf/timing/'+opsystem+'_timing_pred_method.csv')
 
 # %% Benchmark 2: Parallelisation for the .fit() with honesty and inference
 # define loop values
-sample_sizes = [100, 200]
-weight_methods = ['numpy_loop', 'numpy_loop_shared_mpire',
-                  'numpy_loop_shared_joblib', 'numpy_loop_conquer']
-core_sizes = [1, 10]
+sample_sizes = [1000, 5000, 20000]
+weight_methods = ['numpy_loop', 'numpy_loop_shared_joblib',
+                  'numpy_loop_joblib_conquer']
+core_sizes = [1, 4, 10]
 reps = 3
 
 # define storage for results
@@ -153,7 +152,7 @@ for n_sample in sample_sizes:
                                      cat_cat=3)
 
     # Forest: EconML (full dataset as we use honesty)
-    econml = RegressionForest(n_estimators=12, min_samples_leaf=5,
+    econml = RegressionForest(n_estimators=1000, min_samples_leaf=5,
                               max_features=0.3, max_samples=0.5,
                               honest=True, inference=True)
     # estimate and time it
@@ -169,7 +168,7 @@ for n_sample in sample_sizes:
         for method_idx in weight_methods:
             print(method_idx)
             # define the ordered forest
-            orf = OrderedRandomForest(n_estimators=10, min_samples_leaf=5,
+            orf = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
                                       max_features=0.3, replace=False,
                                       sample_fraction=0.5, honesty=True,
                                       inference=True, weight_method=method_idx,
