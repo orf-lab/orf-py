@@ -12,13 +12,13 @@ import pandas as pd
 
 from econml.grf import RegressionForest
 
-# path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
-path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
+# path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
-from orf.OrderedRandomForest import OrderedRandomForest
+from orf.OrderedForest import OrderedForest
 
 # define your operating system
 opsystem = platform.system()
@@ -89,6 +89,7 @@ reps = 3
 time_table = {}
 # start the loop
 for n_sample in sample_sizes:
+    print(n_sample)
     # Generate data set
     features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
                                      p_binary=1, noise=True, y_cat=3,
@@ -106,16 +107,17 @@ for n_sample in sample_sizes:
 
     # loop through different number of cores
     for n_core in core_sizes:
+        print(n_core)
         time_orf_all = []
         # Ordered Forest: loop through different prediction methods
         for method_idx in pred_methods:
             print(method_idx)
             # define the ordered forest
-            orf = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
-                                      max_features=0.3, replace=False,
-                                      sample_fraction=0.5, honesty=True,
-                                      n_jobs=n_core, pred_method=method_idx,
-                                      random_state=n_sample)
+            orf = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                                max_features=0.3, replace=False,
+                                sample_fraction=0.5, honesty=True,
+                                n_jobs=n_core, pred_method=method_idx,
+                                random_state=n_sample)
             # estimate and timeit
             time_orf = timeit.timeit('orf.fit(X=features, y=outcome)',
                                      globals=globals(), number=reps)
@@ -146,6 +148,7 @@ reps = 3
 time_table = {}
 # start the loop
 for n_sample in sample_sizes:
+    print(n_sample)
     # Generate data set
     features, outcome = example_data(seed=123, n=n_sample, p_cont=1, p_cat=1,
                                      p_binary=1, noise=True, y_cat=3,
@@ -163,16 +166,17 @@ for n_sample in sample_sizes:
 
     # loop through different number of cores
     for n_core in core_sizes:
+        print(n_core)
         time_orf_all = []
         # Ordered Forest: loop through different prediction methods
         for method_idx in weight_methods:
             print(method_idx)
             # define the ordered forest
-            orf = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
-                                      max_features=0.3, replace=False,
-                                      sample_fraction=0.5, honesty=True,
-                                      inference=True, weight_method=method_idx,
-                                      n_jobs=n_core, random_state=n_sample)
+            orf = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                                max_features=0.3, replace=False,
+                                sample_fraction=0.5, honesty=True,
+                                inference=True, weight_method=method_idx,
+                                n_jobs=n_core, random_state=n_sample)
             # estimate and timeit
             time_orf = timeit.timeit('orf.fit(X=features, y=outcome)',
                                      globals=globals(), number=reps)

@@ -33,7 +33,7 @@ from functools import partial
 # define BaseOrderedForest class (BaseEstimator allows to call get_params and set_params)
 class BaseOrderedForest(BaseEstimator):
     """
-    Base class for OrderedRandomForest.
+    Base class for OrderedForest.
     Warning: This class should not be used directly. Use derived classes
     instead.
     """
@@ -280,10 +280,10 @@ class BaseOrderedForest(BaseEstimator):
         
     
     # %% Fit function
-    # function to estimate OrderedRandomForest
+    # function to estimate OrderedForest
     def fit(self, X, y):
         """
-        OrderedRandomForest estimation.
+        OrderedForest estimation.
 
         Parameters
         ----------
@@ -302,7 +302,7 @@ class BaseOrderedForest(BaseEstimator):
         # Use sklearn input checks to allow for multiple types of inputs:
         # - returns numpy arrays for X and y (no matter which input type)
         # - forces y to be numeric
-        X,y = check_X_y(X, y, y_numeric=True, estimator="OrderedRandomForest")
+        X,y = check_X_y(X, y, y_numeric=True, estimator="OrderedForest")
         # Get vector of sorted unique values of y
         y_values = np.unique(y)
 
@@ -677,20 +677,6 @@ class BaseOrderedForest(BaseEstimator):
                         # Save weights matrix
                         weights[class_idx] = forest_out
                     else:
-                        # Check whether to use cython implementation or not
-                        if self.pred_method == 'cython':
-                            # Loop over trees
-                            leaf_means = Parallel(
-                                n_jobs=self.n_jobs, prefer="threads")(
-                                    delayed(honest_fit.honest_fit)(
-                                        forest_apply=forest_apply,
-                                        outcome_ind_est=outcome_ind_est,
-                                        trees=tree,
-                                        max_id=max_id) for tree in range(
-                                            0, self.n_estimators))
-                            # assign honest predictions (honest fitted values)
-                            fitted[class_idx] = np.vstack(leaf_means).T
-
                         # Check whether to use loop implementation or not
                         if self.pred_method == 'loop_joblib':
                             # Loop over trees

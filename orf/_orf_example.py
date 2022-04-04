@@ -10,13 +10,13 @@ Showcase application of the Ordered Forest estimator.
 import pandas as pd
 import os
 import numpy as np
-# path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+path="D:\switchdrive\Projects\ORF_Python\ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
-path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
+#path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
 os.chdir(path)
 
 # load the ordered forest
-from orf.OrderedRandomForest import OrderedRandomForest
+from orf.OrderedForest import OrderedForest
 
 # read in example data from the orf package in R
 odata = pd.read_csv('orf/odata.csv')
@@ -30,12 +30,12 @@ features = odata.drop('Y', axis=1)
 # Set seed
 np.random.seed(999)
 # initiate the class with tuning parameters
-oforest = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
-                              max_features=0.3, replace=False,
-                              sample_fraction=0.5, honesty=True,
-                              n_jobs=-1, pred_method='numpy_loop_multi',
-                              weight_method='numpy_loop_conquer',
-                              inference=True)
+oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                        max_features=0.3, replace=False,
+                        sample_fraction=0.5, honesty=True,
+                        n_jobs=-1, pred_method='numpy_loop',
+                        weight_method='numpy_loop',
+                        inference=True)
 # fit the model
 oforest.fit(X=features, y=outcome)
 # print summary of estimation
