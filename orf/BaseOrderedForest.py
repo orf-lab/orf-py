@@ -27,7 +27,6 @@ from multiprocessing import Pool, cpu_count, Lock, shared_memory
 from mpire import WorkerPool
 from functools import partial
 
-_lock = Lock()  # initiate lock
 
 # %% Class definition
     
@@ -491,12 +490,11 @@ class BaseOrderedForest(BaseEstimator):
                         if self.weight_method == 'numpy_loop_shared_joblib':
                             # create the shared object of forest weights dim
                             forest_out = np.zeros((n_samples, n_est))
-                            # _lock = Lock()  # initiate lock
+                            _lock = Lock()  # initiate lock
                             # parallel in shared memory
                             Parallel(
                                 n_jobs=self.n_jobs,
                                 backend="threading"
-                                #require='sharedmem'
                                 )(delayed(
                                     self._forest_weights_shared)(
                                         tree=tree,
@@ -1400,11 +1398,13 @@ class BaseOrderedForest(BaseEstimator):
     # using shared memory
     def _forest_weights_shared(self, tree, forest_apply, forest_apply_all,
                                n_samples, n_est, shared_object, lock):
-        lock.acquire()
-        # perform the parallel task
-        shared_object += self._honest_weight_numpy(tree, forest_apply,
+        # compute the tree weights first in threads
+        tree_weights = self._honest_weight_numpy(tree, forest_apply,
                                                    forest_apply_all, n_samples,
                                                    n_est)
+        # write into shared memory under lock
+        lock.acquire()
+        shared_object += tree_weights
         lock.release()
         return
 
@@ -1570,11 +1570,12 @@ def _forest_weights_joblib(tree, forest_apply, forest_apply_all, n_samples,
 # using shared memory
 def _forest_weights_shared(tree, forest_apply, forest_apply_all, n_samples,
                            n_est, shared_object, lock):
-    # lock.acquire()
-    # perform the parallel task
-    shared_object += _honest_weight_numpy_out(tree, forest_apply,
-                                               forest_apply_all, n_samples,
-                                               n_est)
-    # lock.release()
+    # compute tree weights in parallel
+    tree_weights = _honest_weight_numpy_out(tree, forest_apply,
+                                            forest_apply_all, n_samples, n_est)
+    # update shared memory under lock
+    lock.acquire()
+    shared_object += tree_weights
+    lock.release()
     return
 

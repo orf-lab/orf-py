@@ -85,11 +85,13 @@ def _honest_weight_numpy_out(tree, forest_apply, forest_apply_all, n_samples,
 # using shared memory
 def _forest_weights_shared(tree, forest_apply, forest_apply_all, n_samples,
                            n_est, forest_out, lock):
-    lock.acquire()
-    # perform the parallel task
-    forest_out += _honest_weight_numpy_out(tree, forest_apply,
+    # compute the tree weights first in threads
+    tree_weights = _honest_weight_numpy_out(tree, forest_apply,
                                                forest_apply_all, n_samples,
                                                n_est)
+    # write into shared memory under lock
+    lock.acquire()
+    forest_out += tree_weights
     lock.release()
     return
 
