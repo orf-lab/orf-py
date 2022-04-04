@@ -229,9 +229,11 @@ class BaseOrderedForest(BaseEstimator):
 
         # check whether pred_method is defined correctly
         if (pred_method == 'cython'
-                or pred_method == 'loop'
+                or pred_method == 'loop_joblib'
                 or pred_method == 'loop_multi'
                 or pred_method == 'numpy'
+                or pred_method == 'loop'
+                or pred_method == 'numpy_loop'
                 or pred_method == 'numpy_joblib'
                 or pred_method == 'numpy_multi'
                 or pred_method == 'numpy_mpire'
@@ -692,7 +694,7 @@ class BaseOrderedForest(BaseEstimator):
                             fitted[class_idx] = np.vstack(leaf_means).T
 
                         # Check whether to use loop implementation or not
-                        if self.pred_method == 'loop':
+                        if self.pred_method == 'loop_joblib':
                             # Loop over trees
                             leaf_means = Parallel(
                                 n_jobs=self.n_jobs,
@@ -703,6 +705,21 @@ class BaseOrderedForest(BaseEstimator):
                                         outcome_ind_est=outcome_ind_est,
                                         max_id=max_id) for tree in range(
                                             0, self.n_estimators))
+                            # assign honest predictions (honest fitted values)
+                            fitted[class_idx] = np.vstack(leaf_means).T
+
+                        # Check whether to use loop implementation or not
+                        if self.pred_method == 'loop':
+                            # storage as list
+                            leaf_means = [np.nan for _ in range(self.n_estimators)]
+                            # Loop over trees
+                            for tree in range(self.n_estimators):
+                                # compute preds
+                                leaf_means[tree] = self._honest_fit_func(
+                                    tree=tree,
+                                    forest_apply=forest_apply,
+                                    outcome_ind_est=outcome_ind_est,
+                                    max_id=max_id)
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = np.vstack(leaf_means).T
 
@@ -815,6 +832,20 @@ class BaseOrderedForest(BaseEstimator):
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
                             
+                        if self.pred_method == 'numpy_loop':
+                            # storage as list
+                            leaf_means = [np.nan for _ in range(self.n_estimators)]
+                            # Loop over trees
+                            for tree in range(self.n_estimators):
+                                # compute preds
+                                leaf_means[tree] = self._honest_fit_numpy_func(
+                                    tree=tree,
+                                    forest_apply=forest_apply,
+                                    outcome_ind_est=outcome_ind_est,
+                                    max_id=max_id)
+                            # assign honest predictions (honest fitted values)
+                            fitted[class_idx] = np.vstack(leaf_means).T
+
                         if self.pred_method == 'numpy_loop_ray':
                             # Loop over trees
                             leaf_means = (ray.get(

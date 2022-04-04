@@ -4,10 +4,11 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## To Do:
 
+- synchronise defaults with R (G)
 - decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F)
 - representative test file to compare with R for big data (G)
 - run code analysis and adjust accordingly (G)
-- complete documentation based on R package (G)
+- complete documentation (docstrings) based on R package (G)
 - API reference in Python (F)
 - add examples to docstrings and check attributes vs. returns (F)
 - change to: BaseOrderedForest, OrderedRandomForest, OrderedForest

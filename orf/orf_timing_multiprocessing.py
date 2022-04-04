@@ -79,10 +79,10 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
 
 # %% Benchmark 1: Parallelisation for the .fit() with honesty, no inference
 # define loop values
-sample_sizes = [1000, 5000, 20000]
-pred_methods = ['loop', 'numpy', 'numpy_sparse', 'numpy_sparse2',
-                'numpy_joblib', 'numpy_mpire']
-core_sizes = [1, 4, 10]
+sample_sizes = [1000, 2500, 5000, 10000, 20000]
+pred_methods = ['loop', 'loop_joblib', 'numpy', 'numpy_loop', 'numpy_joblib',
+                'numpy_sparse', 'numpy_sparse2', 'numpy_mpire']
+core_sizes = [1, 4, 8]
 reps = 3
 
 # define storage for results
@@ -136,10 +136,10 @@ timing_pred.to_csv(path+'/orf/timing/'+opsystem+'_timing_pred_method.csv')
 
 # %% Benchmark 2: Parallelisation for the .fit() with honesty and inference
 # define loop values
-sample_sizes = [1000, 5000, 20000]
+sample_sizes = [1000, 2500, 5000, 10000, 20000]
 weight_methods = ['numpy_loop', 'numpy_loop_shared_joblib',
                   'numpy_loop_joblib_conquer']
-core_sizes = [1, 4, 10]
+core_sizes = [1, 4, 8]
 reps = 3
 
 # define storage for results

@@ -847,7 +847,7 @@ class OrderedForest(BaseOrderedForest):
                     forest_apply_all=forest_apply_all,
                     n_samples=n_samples, n_est=n_est)
                 # add tree weights to overall forest weights
-                forest_out = forest_out + tree_out
+                forest_out += tree_out
             # Divide by the number of trees to obtain final weights
             forest_out = forest_out / self.n_estimators
             # Compute predictions and assign to probs vector
