@@ -12,14 +12,13 @@ path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
 os.chdir(path)
 
 # load the ordered forest
-from orf.OrderedRandomForest import OrderedRandomForest
+from orf.OrderedForest import OrderedForest
 
 # initiate the class with tuning parameters
-self = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5, 
-                           max_features=0.3,
-                           replace=False, sample_fraction=0.5, honesty=True,
-                           n_jobs=1, pred_method='numpy_loop', inference=False,
-                           weight_method='numpy_loop')
+self = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3,
+                     replace=False, sample_fraction=0.5, honesty=True,
+                     n_jobs=1, pred_method='numpy_loop', inference=False,
+                     weight_method='numpy_loop')
 
 # Define function to produce data sets of different size
 def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,

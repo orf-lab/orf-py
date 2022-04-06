@@ -234,6 +234,7 @@ class BaseOrderedForest(BaseEstimator):
                 or pred_method == 'loop'
                 or pred_method == 'numpy_loop'
                 or pred_method == 'numpy_joblib'
+                or pred_method == 'numpy_joblib_shared'
                 or pred_method == 'numpy_multi'
                 or pred_method == 'numpy_mpire'
                 or pred_method == 'numpy_sparse'
@@ -815,6 +816,26 @@ class BaseOrderedForest(BaseEstimator):
                                         0, self.n_estimators))
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
+
+                        if self.pred_method == 'numpy_joblib_shared':
+                            # storage as numpy array
+                            leaf_means = np.zeros((max_id, self.n_estimators))
+                            _lock = Lock()  # initiate lock
+                            # parallel in shared memory
+                            Parallel(
+                                n_jobs=self.n_jobs,
+                                backend="threading"
+                                )(delayed(
+                                    self._honest_fit_numpy_shared)(
+                                        tree=tree,
+                                        forest_apply=forest_apply,
+                                        outcome_ind_est=outcome_ind_est,
+                                        max_id=max_id,
+                                        shared_object=leaf_means,
+                                        lock=_lock)
+                                        for tree in range(self.n_estimators))
+                            # assign honest predictions (honest fitted values)
+                            fitted[class_idx] = leaf_means
                             
                         if self.pred_method == 'numpy_loop':
                             # storage as list
@@ -1058,6 +1079,30 @@ class BaseOrderedForest(BaseEstimator):
         leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
 
         return leaf_means
+
+
+    def _honest_fit_numpy_shared(self, tree, forest_apply, outcome_ind_est,
+                                 max_id, shared_object, lock):
+        """Compute the honest leaf means using numpy with shared memory."""
+
+        # create an empty array to save the leaf means
+        leaf_means = np.zeros(max_id)
+        # Create dummy matrix dim(n_est, max_id)
+        onehot = OneHotEncoder(sparse=True).fit_transform(
+            forest_apply[:, tree].reshape(-1, 1))
+        # Compute leaf sums for each leaf
+        leaf_sums = onehot.T.dot(outcome_ind_est)
+        # Determine number of observations per leaf
+        leaf_n = onehot.sum(axis=0)
+        # Compute leaf means for each leaf
+        leaf_means[np.unique(forest_apply[:, tree])] = leaf_sums/leaf_n
+
+        # write into shared memory under lock
+        lock.acquire()
+        shared_object[:, tree] = leaf_means
+        lock.release()
+
+        return
 
 
     def _honest_weight_numpy(self, tree, forest_apply, forest_apply_all,
