@@ -11,3 +11,6 @@
 
 # cache files
 *.pyc
+
+# data from testing
+/orf/_R/results/*
