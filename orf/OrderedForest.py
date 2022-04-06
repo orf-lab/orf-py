@@ -75,8 +75,8 @@ class OrderedForest(OrderedRandomForest):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_mpire',
-                 weight_method='numpy_loop_shared_mpire',
+                 pred_method='numpy_joblib',
+                 weight_method='numpy_loop_shared_joblib',
                  random_state=None):
         # access inherited methods
         super().__init__(

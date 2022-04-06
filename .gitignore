@@ -12,5 +12,6 @@
 # cache files
 *.pyc
 
-# data from testing
+# data from testing, but keep the folder
 /orf/_R/results/*
+!/orf/_R/results/.gitkeep 

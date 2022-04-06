@@ -23,7 +23,7 @@ from sklearn.utils import check_random_state, check_X_y
 from sklearn.utils.validation import _num_samples, _num_features
 from econml.grf import RegressionForest
 from joblib import Parallel, delayed, parallel_backend
-from multiprocessing import Pool, cpu_count, Lock, shared_memory
+from multiprocessing import Pool, cpu_count, Lock
 from mpire import WorkerPool
 from functools import partial
 
@@ -48,8 +48,8 @@ class BaseOrderedForest(BaseEstimator):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_mpire',
-                 weight_method='numpy_loop_shared_mpire',
+                 pred_method='numpy_joblib',
+                 weight_method='numpy_loop_shared_joblib',
                  random_state=None):
 
         self.n_estimators = n_estimators
@@ -68,7 +68,7 @@ class BaseOrderedForest(BaseEstimator):
         # initialize performance metrics
         self.confusion = None
         self.measures = None
-        
+
     def _input_checks(self):
         # check and define the input parameters
         n_estimators = self.n_estimators
@@ -246,11 +246,11 @@ class BaseOrderedForest(BaseEstimator):
             # raise value error
             raise ValueError("pred_method must be of cython, loop or numpy"
                              ", got %s" % pred_method)
-        
+
         if self.pred_method == 'numpy_loop_ray':
             # Initialize ray
             ray.init(num_cpus=self.n_jobs, ignore_reinit_error=True)
-        
+
         # check whether weight_method is defined correctly
         if (weight_method == 'numpy_loop'
                 or weight_method == 'numpy_loop_mpire'

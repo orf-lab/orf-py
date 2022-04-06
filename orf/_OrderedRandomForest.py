@@ -15,7 +15,7 @@ from orf._BaseOrderedForest import BaseOrderedForest
 from sklearn.utils import check_array
 from sklearn.utils.validation import _num_samples, check_is_fitted
 from scipy import stats
-from plotnine import (ggplot, aes, geom_density, facet_wrap, geom_vline, 
+from plotnine import (ggplot, aes, geom_density, facet_wrap, geom_vline,
                       ggtitle, xlab, ylab, theme_bw, theme, element_rect)
 
 
@@ -36,8 +36,8 @@ class OrderedRandomForest(BaseOrderedForest):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_mpire',
-                 weight_method='numpy_loop_shared_mpire',
+                 pred_method='numpy_joblib',
+                 weight_method='numpy_loop_shared_joblib',
                  random_state=None):
         # access inherited methods
         super().__init__(

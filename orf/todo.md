@@ -4,6 +4,8 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## To Do:
 
+- return variances as None for both margins as well as fit (G)
+- rename .margin() to .margins() for compatibility with R package (G)
 - synchronise defaults with R (G)
 - decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F)
 - representative test file to compare with R for big data (G)
@@ -59,4 +61,5 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Comments:
 
-- 
+- switch completely to EconML ?
+- allow for honesty=True and replace=True ?
