@@ -31,6 +31,8 @@ dataset <- as.data.frame(dataset)
 # rename vars nicely
 colnames(dataset) <- c("HealthInsurance", "NonWhite", "Age", "Education",
                        "FamilySize", "Employed", "Income", "Female", "y")
+# save data to disk
+write.csv(dataset, file = paste0(path, '/data/empdata_test.csv'), row.names = F)
 
 # ---------------------------------------------------------------------------- #
 
@@ -94,8 +96,8 @@ for (data_idx in data_types) {
       }
       # lastly loop through subsampling option
       for (replace_idx in replace_options) {
-        # check if the setting is admissible
-        if (inference_idx == TRUE & honesty_idx == TRUE & replace_idx == TRUE) {
+        # check if the setting is admissible (for comparison with python)
+        if (honesty_idx == TRUE & replace_idx == TRUE) {
           next
         }
         # print current iteration
@@ -132,15 +134,19 @@ for (data_idx in data_types) {
         names(margins_results) <- c('margins_effects', 'margins_vars')
         
         # save the results for plot
-        ggsave(filename = paste0('/results/', data_idx, '_', 'plot_I_', inference_idx, 
+        ggsave(filename = paste0('/results/R_', data_idx, '_', 'plot_I_', inference_idx, 
                                  '_H_', honesty_idx, '_R_', replace_idx, '.png'),
                plot = orf_plot, path = path)
         
         # save the results for fit
         for (fit_idx in seq_along(fit_results)) {
+          # check if its empty
+          if (is.null(fit_results[[fit_idx]])) {
+            next
+          }
           # save the results
           write.csv(fit_results[[fit_idx]],
-                    file = paste0(path, '/results/', data_idx, '_',
+                    file = paste0(path, '/results/R_', data_idx, '_',
                                   names(fit_results)[[fit_idx]],
                                   '_I_', inference_idx, '_H_', honesty_idx, '_R_',
                                   replace_idx, '.csv'),
@@ -149,9 +155,13 @@ for (data_idx in data_types) {
         
         # save the results for margins
         for (margin_idx in seq_along(margins_results)) {
+          # check if its empty
+          if (is.null(margins_results[[margin_idx]])) {
+            next
+          }
           # save the results
           write.csv(margins_results[[margin_idx]],
-                    file = paste0(path, '/results/', data_idx, '_',
+                    file = paste0(path, '/results/R_', data_idx, '_',
                                   names(margins_results)[[margin_idx]],
                                   '_I_', inference_idx, '_H_', honesty_idx, '_R_',
                                   replace_idx, '.csv'),
