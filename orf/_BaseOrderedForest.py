@@ -1025,10 +1025,23 @@ class BaseOrderedForest(BaseEstimator):
         acc = np.mean(y == class_pred)
 
         # create te confusion matrix
-        # First generate onehot matrices of y and class_pred        
+        # First generate onehot matrice of y      
         y_onehot = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1, 1))
-        class_pred_onehot = OneHotEncoder(sparse=False).fit_transform(
-            class_pred.reshape(-1, 1))
+        # Find unique predicted classes
+        class_pred_u = np.unique(class_pred)
+        # Check if there exists a class for which no predictions exist
+        if not np.array_equal(class_pred_u, y_values):
+            # Find class(es) which have no predictions
+            extra = np.setdiff1d(y_values, class_pred_u)
+            # Add them to the predictions
+            class_pred_ext = np.append(class_pred, extra)
+            # Generate onehot matrix of predictions and drop extra classes
+            class_pred_onehot = OneHotEncoder(sparse=False).fit_transform(
+                class_pred_ext.reshape(-1, 1))[:len(y),:]
+        else:
+            # Generate onehot matrix of predictions
+            class_pred_onehot = OneHotEncoder(sparse=False).fit_transform(
+                class_pred.reshape(-1, 1))
         # Compute dot product of these matrices to obtain confusion matrix
         confusion_mat = np.dot(np.transpose(y_onehot), class_pred_onehot)
         labels = ['Class ' + str(c_idx) for c_idx in y_values]

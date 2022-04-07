@@ -12,9 +12,9 @@ import pandas as pd
 
 from econml.grf import RegressionForest
 
-# path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
+path = "D:/switchdrive/Projects/ORF_Python/ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
-path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
+# path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -79,7 +79,7 @@ def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
 
 # %% Benchmark 1: Parallelisation for the .fit() with honesty, no inference
 # define loop values
-sample_sizes = [1000, 2500, 5000, 10000, 20000]
+sample_sizes = [1000, 2500, 5000, 10000, 20000, 50000, 100000]
 pred_methods = ['loop', 'loop_joblib', 'numpy', 'numpy_loop', 'numpy_joblib',
                 'numpy_joblib_shared', 'numpy_sparse', 'numpy_sparse2']
 core_sizes = [1, 4, 8]
@@ -133,7 +133,7 @@ for n_sample in sample_sizes:
 pred_methods.append('EconML')
 timing_pred = pd.DataFrame(time_table, index=pred_methods).T
 # save the timing results
-timing_pred.to_csv(path+'/orf/_timing/'+opsystem+'_timing_pred_method.csv')
+timing_pred.to_csv(path+'/orf/_timing/'+opsystem+'_timing_pred_method_shared.csv')
 
 
 # %% Benchmark 2: Parallelisation for the .fit() with honesty and inference

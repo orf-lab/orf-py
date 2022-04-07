@@ -5,18 +5,15 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 ## To Do:
 
 - return variances as None for both margins as well as fit (G)
-- rename .margin() to .margins() for compatibility with R package (G)
 - synchronise defaults with R (G)
-- decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F)
+- decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F): for weights: numpy_loop_shared_joblib
 - representative test file to compare with R for big data (G)
 - run code analysis and adjust accordingly (G)
 - complete documentation (docstrings) based on R package (G)
 - API reference in Python (F)
 - add examples to docstrings and check attributes vs. returns (F)
-- change to: BaseOrderedForest, OrderedRandomForest, OrderedForest
 - PyPi package name: orf
 - decide on GitHub structure (own repo vs. organisation for released version) (F, G)
-
 - check how to handle categorical variables in R (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)
 - implement while loop in R for marginal effects if window too small to yield different x_up and x_down (G)
 - add optional argument in R to compute marginal effects only for certain variables (G)
@@ -28,6 +25,8 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Done:
 
+- change to: BaseOrderedForest, OrderedRandomForest, OrderedForest (F)
+- rename .margin() to .margins() for compatibility with R package (F)
 - simplify weight method 'numpy_loop' via calling '_honest_weight_numpy' function directly (G)
 - check time comparisons for parallelisation (G)
 - replace mse2 with ranked probability score (G)

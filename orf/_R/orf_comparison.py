@@ -13,8 +13,8 @@ import numpy as np
 
 from plotnine import ggsave
 
-# path="D:\switchdrive\Projects\ORF_Python\ORFpy"
-path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+#path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
@@ -41,8 +41,8 @@ for data_idx in data_types:
         Y = odata['Y']
     else:
         # specify response and covariates
-        X = odata.drop('y', axis=1)
-        Y = odata['y']
+        X = dataset.drop('y', axis=1)
+        Y = dataset['y']
 
     # loop through different settings and save results
     for inference_idx in inference_options:
@@ -54,6 +54,8 @@ for data_idx in data_types:
             # loop thorugh subsampling options
             for replace_idx in replace_options:
                 # check if the setting is admissible
+                if honesty_idx and replace_idx:
+                    continue
                 if inference_idx and honesty_idx and replace_idx:
                     continue
                 # print current iteration
@@ -86,7 +88,7 @@ for data_idx in data_types:
                 orf_plot = orf_fit.plot()
 
                 # get the margins (mean margins for reliable comparison)
-                orf_margins = orf_fit.margin(eval_point="mean")
+                orf_margins = orf_fit.margins(eval_point="mean")
                 margins_effects = orf_margins['effects']
                 margins_vars = orf_margins['variances']
                 # wrap into dictionary
@@ -103,6 +105,11 @@ for data_idx in data_types:
 
                 # save the results for fit
                 for key, value in fit_results.items():
+                    if type(value) is dict:
+                        if value == {}:
+                            value = [0]
+                    if value is None:
+                        value = [0]
                     # save the results
                     np.savetxt(fname=(path + '/orf/_R/results/py_' + data_idx
                                       + '_' + str(key) + '_I_' +
@@ -113,6 +120,11 @@ for data_idx in data_types:
 
                 # save the results for margins
                 for key, value in margins_results.items():
+                    if type(value) is dict:
+                        if value == {}:
+                            value = [0]
+                    if value is None:
+                        value = [0]
                     # save the results
                     np.savetxt(fname=(path + '/orf/_R/results/py_' + data_idx
                                       + '_' + str(key) + '_I_' +

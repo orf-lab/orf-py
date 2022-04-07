@@ -15,6 +15,8 @@ from orf._BaseOrderedForest import BaseOrderedForest
 from sklearn.utils import check_array
 from sklearn.utils.validation import _num_samples, check_is_fitted
 from scipy import stats
+from joblib import Parallel, delayed
+from multiprocessing import Lock
 from plotnine import (ggplot, aes, geom_density, facet_wrap, geom_vline,
                       ggtitle, xlab, ylab, theme_bw, theme, element_rect)
 
@@ -201,10 +203,10 @@ class OrderedRandomForest(BaseOrderedForest):
         return result
 
 
-    # %% Margin function
+    # %% Margins function
     # function to evaluate marginal effects with estimated ordered forest
-    def margin(self, X=None, X_cat=None, X_eval=None, eval_point="mean",
-               window=0.1, verbose=True):
+    def margins(self, X=None, X_cat=None, X_eval=None, eval_point="mean",
+                window=0.1, verbose=True):
         """
         OrderedForest marginal effects.
 
@@ -834,10 +836,26 @@ class OrderedRandomForest(BaseOrderedForest):
             n_est = forest_apply.shape[0]
             # Get leaf IDs for newdata
             forest_apply_all = self.forest_['forests'][class_idx].apply(X)
-# =============================================================================
-# In the end: insert here weight.method which works best. For now numpy_loop
-# =============================================================================
-            # self.weight_method == 'numpy_loop':
+            # Use numpy_loop_shared_joblib implementation for weights
+            # create the shared object of forest weights dim
+            forest_out = np.zeros((n_samples, n_est))
+            _lock = Lock()  # initiate lock
+            # parallel in shared memory
+            Parallel(
+                n_jobs=self.n_jobs,
+                backend="threading"
+                )(delayed(
+                    self._forest_weights_shared)(
+                        tree=tree,
+                        forest_apply=forest_apply,
+                        forest_apply_all=forest_apply_all,
+                        n_samples=n_samples,
+                        n_est=n_est,
+                        shared_object=forest_out,
+                        lock=_lock)
+                        for tree in range(self.n_estimators))
+
+            """
             # generate storage matrix for weights
             forest_out = np.zeros((n_samples, n_est))
             # Loop over trees
@@ -848,6 +866,7 @@ class OrderedRandomForest(BaseOrderedForest):
                     n_samples=n_samples, n_est=n_est)
                 # add tree weights to overall forest weights
                 forest_out += tree_out
+            """
             # Divide by the number of trees to obtain final weights
             forest_out = forest_out / self.n_estimators
             # Compute predictions and assign to probs vector
@@ -855,9 +874,6 @@ class OrderedRandomForest(BaseOrderedForest):
             probs[:, class_idx-1] = np.asarray(predictions.T).reshape(-1)
             # Save weights matrix
             weights[class_idx] = forest_out
-# =============================================================================
-# End of numpy_loop
-# =============================================================================
         return probs, weights
 
 

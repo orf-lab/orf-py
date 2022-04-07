@@ -168,8 +168,8 @@ class OrderedForest(OrderedRandomForest):
         return super().predict(X=X, prob=prob)
     
     
-    def margin(self, X=None, X_cat=None, X_eval=None, eval_point="mean",
-               window=0.1, verbose=True):
+    def margins(self, X=None, X_cat=None, X_eval=None, eval_point="mean",
+                window=0.1, verbose=True):
         """
         OrderedForest marginal effects.
 
@@ -209,9 +209,9 @@ class OrderedForest(OrderedRandomForest):
                  of marginal effects, variances, standard errors, t-values or 
                  p-values, respectively.
         """
-        return super().margin(X=X, X_cat=X_cat, X_eval=X_eval, 
-                              eval_point=eval_point, window=window,
-                              verbose=verbose)
+        return super().margins(X=X, X_cat=X_cat, X_eval=X_eval, 
+                               eval_point=eval_point, window=window,
+                               verbose=verbose)
     
     
     def summary(self, item=None):
@@ -221,7 +221,7 @@ class OrderedForest(OrderedRandomForest):
         Parameters
         ----------
         item : Nonetype or dict
-               Object that should be summarized: Either prediction or margin 
+               Object that should be summarized: Either prediction or margins 
                output or None. If None then forest parameters will be printed.
                
         Returns

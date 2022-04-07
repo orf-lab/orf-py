@@ -62,34 +62,37 @@ an underscore is <a href="https://docs.python.org/3/tutorial/classes.html#privat
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="orf.example_data"><code class="name flex">
-<span>def <span class="ident">example_data</span></span>(<span>seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3, cat_cat=3)</span>
+<span>def <span class="ident">example_data</span></span>(<span>seed=None, n_samples=1000, p_cont=1, p_cat=1, p_binary=1, noise=True, y_classes=3, cat_classes=3)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Generate example data to test orf</p>
+<div class="desc"><p>Generate example data for OrderedForest.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>seed</code></strong> :&ensp;<code>TYPE: integer</code></dt>
-<dd>DESCRIPTION: Set seed for reproducability.</dd>
-<dt><strong><code>n</code></strong> :&ensp;<code>TYPE: integer</code></dt>
-<dd>DESCRIPTION: The number of observations.</dd>
-<dt><strong><code>p_cont</code></strong> :&ensp;<code>TYPE: integer</code></dt>
-<dd>DESCRIPTION: The number of continuous covariates.</dd>
-<dt><strong><code>p_cat</code></strong> :&ensp;<code>TYPE: integer</code></dt>
-<dd>DESCRIPTION: The number of categorical covariates.</dd>
-<dt><strong><code>p_binary</code></strong> :&ensp;<code>TYPE: integer</code></dt>
-<dd>DESCRIPTION. The number of binary covariates.</dd>
-<dt><strong><code>noise</code></strong> :&ensp;<code>TYPE_ boolean</code>, optional</dt>
-<dd>DESCRIPTION. Whether to include a continuous noise variable. The
-default is True.</dd>
-<dt><strong><code>y_cat</code></strong> :&ensp;<code>TYPE: integer</code>, optional</dt>
-<dd>DESCRIPTION. The number of categories of the outcome variable. The
-default is 3.</dd>
-<dt><strong><code>cat_cat</code></strong> :&ensp;<code>TYPE: integer</code>, optional</dt>
-<dd>DESCRIPTION. The number of categories of the categorical variable. The
-default is 3.</dd>
+<dt><strong><code>seed</code></strong> :&ensp;<code>integer</code> or <code>NoneType</code></dt>
+<dd>Set seed for reproducability.</dd>
+<dt><strong><code>n_samples</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of observations.</dd>
+<dt><strong><code>p_cont</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of continuous covariates drawn from a normal distribution.</dd>
+<dt><strong><code>p_cat</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of categorical covariates drawn from a binomial distribution.</dd>
+<dt><strong><code>p_binary</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of binary covariates drawn from a binomial distribution.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>boolean</code></dt>
+<dd>Whether to include a continuous noise variable that does not influence
+the outcome. The default is True.</dd>
+<dt><strong><code>y_classes</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of classes of the outcome variable. The default is 3.</dd>
+<dt><strong><code>cat_classes</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of classes of the categorical variable(s). The default is 3.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>Example dataset.</p></div>
+<dl>
+<dt><strong><code>X</code></strong> :&ensp;<code>ndarray</code></dt>
+<dd>The generated covariates/features.</dd>
+<dt><strong><code>y</code></strong> :&ensp;<code>ndarray</code></dt>
+<dd>The generated outcomes.</dd>
+</dl></div>
 </dd>
 </dl>
 </section>
@@ -202,8 +205,8 @@ oforest = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
 oforest.fit(X=features, y=outcome)
 </code></pre></div>
 </dd>
-<dt id="orf.OrderedForest.margin"><code class="name flex">
-<span>def <span class="ident">margin</span></span>(<span>self, X=None, X_cat=None, X_eval=None, eval_point='mean', window=0.1, verbose=True)</span>
+<dt id="orf.OrderedForest.margins"><code class="name flex">
+<span>def <span class="ident">margins</span></span>(<span>self, X=None, X_cat=None, X_eval=None, eval_point='mean', window=0.1, verbose=True)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>OrderedForest marginal effects.</p>
@@ -295,7 +298,7 @@ result.get("variances") to extract array of variances.</dd>
 <h2 id="parameters">Parameters</h2>
 <dl>
 <dt><strong><code>item</code></strong> :&ensp;<code>Nonetype</code> or <code>dict</code></dt>
-<dd>Object that should be summarized: Either prediction or margin
+<dd>Object that should be summarized: Either prediction or margins
 output or None. If None then forest parameters will be printed.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
@@ -326,7 +329,7 @@ output or None. If None then forest parameters will be printed.</dd>
 <h4><code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code></h4>
 <ul class="two-column">
 <li><code><a title="orf.OrderedForest.fit" href="#orf.OrderedForest.fit">fit</a></code></li>
-<li><code><a title="orf.OrderedForest.margin" href="#orf.OrderedForest.margin">margin</a></code></li>
+<li><code><a title="orf.OrderedForest.margins" href="#orf.OrderedForest.margins">margins</a></code></li>
 <li><code><a title="orf.OrderedForest.performance" href="#orf.OrderedForest.performance">performance</a></code></li>
 <li><code><a title="orf.OrderedForest.plot" href="#orf.OrderedForest.plot">plot</a></code></li>
 <li><code><a title="orf.OrderedForest.predict" href="#orf.OrderedForest.predict">predict</a></code></li>
