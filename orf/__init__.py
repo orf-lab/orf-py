@@ -38,6 +38,7 @@
 """
 
 from orf.OrderedForest import OrderedForest
-__all__ = ["OrderedForest"]
+from orf._utils import example_data
+__all__ = ["OrderedForest", "example_data"]
 
 

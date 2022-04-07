@@ -59,13 +59,46 @@ an underscore is <a href="https://docs.python.org/3/tutorial/classes.html#privat
 <section>
 </section>
 <section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="orf.example_data"><code class="name flex">
+<span>def <span class="ident">example_data</span></span>(<span>seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3, cat_cat=3)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Generate example data to test orf</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>seed</code></strong> :&ensp;<code>TYPE: integer</code></dt>
+<dd>DESCRIPTION: Set seed for reproducability.</dd>
+<dt><strong><code>n</code></strong> :&ensp;<code>TYPE: integer</code></dt>
+<dd>DESCRIPTION: The number of observations.</dd>
+<dt><strong><code>p_cont</code></strong> :&ensp;<code>TYPE: integer</code></dt>
+<dd>DESCRIPTION: The number of continuous covariates.</dd>
+<dt><strong><code>p_cat</code></strong> :&ensp;<code>TYPE: integer</code></dt>
+<dd>DESCRIPTION: The number of categorical covariates.</dd>
+<dt><strong><code>p_binary</code></strong> :&ensp;<code>TYPE: integer</code></dt>
+<dd>DESCRIPTION. The number of binary covariates.</dd>
+<dt><strong><code>noise</code></strong> :&ensp;<code>TYPE_ boolean</code>, optional</dt>
+<dd>DESCRIPTION. Whether to include a continuous noise variable. The
+default is True.</dd>
+<dt><strong><code>y_cat</code></strong> :&ensp;<code>TYPE: integer</code>, optional</dt>
+<dd>DESCRIPTION. The number of categories of the outcome variable. The
+default is 3.</dd>
+<dt><strong><code>cat_cat</code></strong> :&ensp;<code>TYPE: integer</code>, optional</dt>
+<dd>DESCRIPTION. The number of categories of the categorical variable. The
+default is 3.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>Example dataset.</p></div>
+</dd>
+</dl>
 </section>
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
 <dt id="orf.OrderedForest"><code class="flex name class">
 <span>class <span class="ident">OrderedForest</span></span>
-<span>(</span><span>n_estimators=1000, min_samples_leaf=5, max_features=0.3, replace=True, sample_fraction=0.5, honesty=False, honesty_fraction=0.5, inference=False, n_jobs=-1, pred_method='numpy_mpire', weight_method='numpy_loop_shared_mpire', random_state=None)</span>
+<span>(</span><span>n_estimators=1000, min_samples_leaf=5, max_features=0.3, replace=True, sample_fraction=0.5, honesty=False, honesty_fraction=0.5, inference=False, n_jobs=-1, pred_method='numpy_joblib', weight_method='numpy_loop_shared_joblib', random_state=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Ordered Random Forests class labeled 'OrderedForest'.</p>
@@ -282,6 +315,11 @@ output or None. If None then forest parameters will be printed.</dd>
 </ul>
 </div>
 <ul id="index">
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="orf.example_data" href="#orf.example_data">example_data</a></code></li>
+</ul>
+</li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
