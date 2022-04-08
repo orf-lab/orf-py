@@ -38,8 +38,6 @@ class OrderedRandomForest(BaseOrderedForest):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_joblib',
-                 weight_method='numpy_loop_shared_joblib',
                  random_state=None):
         # access inherited methods
         super().__init__(
@@ -52,8 +50,6 @@ class OrderedRandomForest(BaseOrderedForest):
             honesty_fraction=honesty_fraction,
             inference=inference,
             n_jobs=n_jobs,
-            pred_method=pred_method,
-            weight_method=weight_method,
             random_state=random_state
         )
 
@@ -242,9 +238,10 @@ class OrderedRandomForest(BaseOrderedForest):
         result : dict
                  Dictionary containing results of marginal effects estimation.
                  Use result.get("...") with "effects", "variances",
-                 "std_errors", "t-values" or "p-values" to extract arrays of
-                 marginal effects, variances, standard errors, t-values or 
-                 p-values, respectively.
+                 "std_errors", "t-values", "p-values", "ci-up" or "ci-down" to 
+                 extract arrays of marginal effects, variances, standard
+                 errors, t-values, p-values or upper and lower confidence
+                 intervals, respectively.
         """
 
         # %% Input checks
@@ -738,12 +735,18 @@ class OrderedRandomForest(BaseOrderedForest):
                                 where=sd_me!=0)
             # p values
             p_values = 2*stats.norm.sf(np.abs(t_values))
+            # add 95% confidence intervals
+            crit_val = np.abs(stats.norm.ppf(.975))
+            ci_up = margins + crit_val*sd_me
+            ci_down = margins - crit_val*sd_me
         else:
             # no values for the other parameters if inference is not desired
             variance_me = None
             sd_me = None
             t_values = None
             p_values = None
+            ci_up = None
+            ci_down = None
 
         # put everything into a dict of results
         results = {'output': 'margin',
@@ -753,7 +756,9 @@ class OrderedRandomForest(BaseOrderedForest):
                    'variances': variance_me,
                    'std_errors': sd_me,
                    't-values': t_values,
-                   'p-values': p_values}
+                   'p-values': p_values,
+                   'ci-up': ci_up,
+                   'ci-down': ci_down}
 
         # check if marginal effects should be printed
         if verbose:
@@ -784,7 +789,7 @@ class OrderedRandomForest(BaseOrderedForest):
 
         return results
     
-    #Function to predict via sklearn
+    # Function to predict via sklearn
     def _predict_default(self, X, n_samples):
         # create an empty array to save the predictions
         probs = np.empty((n_samples, self.n_class-1))
@@ -795,7 +800,7 @@ class OrderedRandomForest(BaseOrderedForest):
         return probs
         
 
-    #Function to predict via leaf means
+    # Function to predict via leaf means
     def _predict_leafmeans(self, X, n_samples):
         # create an empty array to save the predictions
         probs = np.empty((n_samples, self.n_class-1))
@@ -816,7 +821,7 @@ class OrderedRandomForest(BaseOrderedForest):
         return probs
 
         
-    #Function to predict via weights
+    # Function to predict via weights
     def _predict_weights(self, X, n_samples):
         # create an empty array to save the predictions
         probs = np.empty((n_samples, self.n_class-1))
@@ -836,37 +841,41 @@ class OrderedRandomForest(BaseOrderedForest):
             n_est = forest_apply.shape[0]
             # Get leaf IDs for newdata
             forest_apply_all = self.forest_['forests'][class_idx].apply(X)
-            # Use numpy_loop_shared_joblib implementation for weights
             # create the shared object of forest weights dim
             forest_out = np.zeros((n_samples, n_est))
-            _lock = Lock()  # initiate lock
-            # parallel in shared memory
-            Parallel(
-                n_jobs=self.n_jobs,
-                backend="threading"
-                )(delayed(
-                    self._forest_weights_shared)(
+
+            # depending on n_jobs setting, use numpy_loop_shared_joblib
+            # implementation for weights or no parallelization
+            if self.n_jobs is not None:
+                # use shared memory parallelization via threads in joblib
+                _lock = Lock()  # initiate lock
+                # parallel in shared memory
+                Parallel(
+                    n_jobs=self.n_jobs,
+                    backend="threading"
+                    )(delayed(
+                        self._forest_weights_shared)(
+                            tree=tree,
+                            forest_apply=forest_apply,
+                            forest_apply_all=forest_apply_all,
+                            n_samples=n_samples,
+                            n_est=n_est,
+                            shared_object=forest_out,
+                            lock=_lock)
+                            for tree in range(self.n_estimators))
+            else:
+                # Loop over trees without multithreading
+                for tree in range(self.n_estimators):
+                    # get honest tree weights
+                    tree_out = self._honest_weight_numpy(
                         tree=tree,
                         forest_apply=forest_apply,
                         forest_apply_all=forest_apply_all,
                         n_samples=n_samples,
-                        n_est=n_est,
-                        shared_object=forest_out,
-                        lock=_lock)
-                        for tree in range(self.n_estimators))
+                        n_est=n_est)
+                    # add tree weights to overall forest weights
+                    forest_out += tree_out
 
-            """
-            # generate storage matrix for weights
-            forest_out = np.zeros((n_samples, n_est))
-            # Loop over trees
-            for tree in range(self.n_estimators):
-                tree_out = self._honest_weight_numpy(
-                    tree=tree, forest_apply=forest_apply, 
-                    forest_apply_all=forest_apply_all,
-                    n_samples=n_samples, n_est=n_est)
-                # add tree weights to overall forest weights
-                forest_out += tree_out
-            """
             # Divide by the number of trees to obtain final weights
             forest_out = forest_out / self.n_estimators
             # Compute predictions and assign to probs vector
@@ -994,6 +1003,18 @@ class OrderedRandomForest(BaseOrderedForest):
             if item['p-values'] is not None:
                 print('p-values:', 
                       pd.DataFrame(data=item['p-values'], 
+                                   index=['X' + sub for sub in string_seq_X], 
+                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                      '-' * 60, sep='\n')
+            if item['ci-up'] is not None:
+                print('ci-up:', 
+                      pd.DataFrame(data=item['ci-up'], 
+                                   index=['X' + sub for sub in string_seq_X], 
+                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                      '-' * 60, sep='\n')
+            if item['ci-down'] is not None:
+                print('ci-down:', 
+                      pd.DataFrame(data=item['ci-down'], 
                                    index=['X' + sub for sub in string_seq_X], 
                                    columns=['Cat' + sub for sub in string_seq_cat]),
                       '-' * 60, sep='\n')

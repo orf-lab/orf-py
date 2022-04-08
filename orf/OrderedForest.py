@@ -41,20 +41,9 @@ class OrderedForest(OrderedRandomForest):
         If True the weight based inference is conducted. The
         default is False.
     n_jobs : int or None
-        The number of parallel jobs to be used for parallelism;
+        The number of parallel jobs to be used for multithreading;
         follows joblib semantics. `n_jobs=-1` means all - 1 available cpu cores.
-        `n_jobs=None` means no parallelism. There is no parallelism implemented
-        for `pred_method='numpy'`. The default is -1.
-    pred_method : str
-        Which method to use to compute honest predictions, one of `'cython'`, 
-        `'loop'`, `'numpy'`, `'numpy_loop'`, `'numpy_loop_multi'`, 
-        `'numpy_loop_mpire'` or `'numpy_sparse'`. The
-        default is `'numpy_loop_mpire'`.
-    weight_method : str
-        Which method to use to compute honest weights, one of `'numpy_loop'`, 
-        `'numpy_loop_mpire'`, `numpy_loop_multi'`, `numpy_loop_shared_multi`
-        or `numpy_loop_shared_mpire`. The default is 
-        `'numpy_loop_shared_mpire'`.
+        `n_jobs=None` and `n_jobs=1` means no parallelism. The default is -1.
     random_state : int, None or numpy.random.RandomState object
         Random seed used to initialize the pseudo-random number
         generator. The default is None. See **[numpy documentation](https://numpy.org/doc/stable/reference/random/legacy.html){:target="_blank"}**
@@ -75,8 +64,6 @@ class OrderedForest(OrderedRandomForest):
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
-                 pred_method='numpy_joblib',
-                 weight_method='numpy_loop_shared_joblib',
                  random_state=None):
         # access inherited methods
         super().__init__(
@@ -89,8 +76,6 @@ class OrderedForest(OrderedRandomForest):
             honesty_fraction=honesty_fraction,
             inference=inference,
             n_jobs=n_jobs,
-            pred_method=pred_method,
-            weight_method=weight_method,
             random_state=random_state
         )
         
@@ -133,9 +118,7 @@ class OrderedForest(OrderedRandomForest):
         oforest = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
                                       max_features=0.3, replace=False,
                                       sample_fraction=0.5, honesty=True,
-                                      n_jobs=-1, pred_method='numpy_loop',
-                                      weight_method='numpy_loop',
-                                      inference=True)
+                                      n_jobs=-1, inference=True)
         
         # OrderedForest estimation
         oforest.fit(X=features, y=outcome)

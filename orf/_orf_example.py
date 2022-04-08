@@ -9,13 +9,13 @@ Showcase application of the Ordered Forest estimator.
 # import modules
 import os
 import orf
-path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+# path="D:\switchdrive\Projects\ORF_Python\ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
-# path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
+path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
 os.chdir(path)
 
 # get example data
-outcome, features  = orf.example_data()
+features, outcome  = orf.example_data()
 
 # Ordered Forest estimation
 
@@ -23,7 +23,7 @@ outcome, features  = orf.example_data()
 oforest = orf.OrderedForest(n_estimators=1000, min_samples_leaf=5,
                             max_features=0.3, replace=False,
                             sample_fraction=0.5, honesty=True,
-                            n_jobs=-1, inference=True)
+                            n_jobs=-1, inference=True, random_state=1)
 # fit the model
 oforest.fit(X=features, y=outcome)
 # print summary of estimation

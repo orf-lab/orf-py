@@ -4,27 +4,29 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## To Do:
 
-- return variances as None for both margins as well as fit (G)
 - synchronise defaults with R (G)
-- decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F): for weights: numpy_loop_shared_joblib
-- representative test file to compare with R for big data (G)
 - run code analysis and adjust accordingly (G)
 - complete documentation (docstrings) based on R package (G)
 - API reference in Python (F)
 - add examples to docstrings and check attributes vs. returns (F)
-- PyPi package name: orf
-- decide on GitHub structure (own repo vs. organisation for released version) (F, G)
+
 - check how to handle categorical variables in R (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)
 - implement while loop in R for marginal effects if window too small to yield different x_up and x_down (G)
 - add optional argument in R to compute marginal effects only for certain variables (G)
 - simplify the categorical variable condition in R package to ensure difference of exactly 1 as in Python (G)
 - check in R if atmean is handled as atmedian for categorical and ummy variables (G)
 
-- code deadline: 1.4.2022
-- documentation deadline: 1.4.2022
-
 ## Done:
 
+- added parallelization option to scikit-learn and econml forest building (G)
+- get rid of the unused functions and clean the code (G)
+- decide how to handle parallel computing and which method (for all fit, predict and margin functions) (G,F): for weights: numpy_loop_shared_joblib, for predictions: numpy_joblib
+- adjust options for usage of multithreading or not (G)
+- add confidence intervals for margins (G)
+- return variances as None for both margins as well as fit (G)
+- decide on GitHub structure (organisation 'orf-lab' for released versions as mirrors) (F, G)
+- PyPi package name: orf
+- representative test file to compare with R for big data (G)
 - change to: BaseOrderedForest, OrderedRandomForest, OrderedForest (F)
 - rename .margin() to .margins() for compatibility with R package (F)
 - simplify weight method 'numpy_loop' via calling '_honest_weight_numpy' function directly (G)
