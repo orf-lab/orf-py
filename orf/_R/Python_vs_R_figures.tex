@@ -1,0 +1,170 @@
+\documentclass[landscape]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[a4paper,
+            bindingoffset=0.2in,
+            left=0.5in,
+            right=0.5in,
+            top=0.5in,
+            bottom=0.5in,
+            footskip=.25in]{geometry}
+
+\title{orf: R vs. Python}
+\date{April 2022}
+
+\begin{document}
+
+\maketitle
+
+\pagebreak
+
+\section{Prediction Comparison}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_synth_plot_I_FALSE_H_FALSE_R_TRUE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_synth_plot_I_FALSE_H_FALSE_R_TRUE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Synthetic Data: No Inference, No Honesty, No Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_synth_plot_I_FALSE_H_FALSE_R_FALSE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_synth_plot_I_FALSE_H_FALSE_R_FALSE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Synthetic Data: No Inference, No Honesty, Yes Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_synth_plot_I_FALSE_H_TRUE_R_FALSE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_synth_plot_I_FALSE_H_TRUE_R_FALSE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Synthetic Data: No Inference, Yes Honesty, Yes Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_synth_plot_I_TRUE_H_TRUE_R_FALSE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_synth_plot_I_TRUE_H_TRUE_R_FALSE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Synthetic Data: Yes Inference, Yes Honesty, Yes Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_emp_plot_I_FALSE_H_FALSE_R_TRUE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_emp_plot_I_FALSE_H_FALSE_R_TRUE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Empirical Data: No Inference, No Honesty, No Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_emp_plot_I_FALSE_H_FALSE_R_FALSE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_emp_plot_I_FALSE_H_FALSE_R_FALSE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Empirical Data: No Inference, No Honesty, Yes Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_emp_plot_I_FALSE_H_TRUE_R_FALSE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_emp_plot_I_FALSE_H_TRUE_R_FALSE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Empirical Data: No Inference, Yes Honesty, Yes Subsampling}
+\label{fig:test}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/R_emp_plot_I_TRUE_H_TRUE_R_FALSE.png}
+  \caption{R}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+  \includegraphics[width=0.95\textwidth]{results/py_emp_plot_I_TRUE_H_TRUE_R_FALSE.png}
+  \caption{Python}
+  \label{fig:sub2}
+\end{subfigure}
+\caption{Empirical Data: Yes Inference, Yes Honesty, Yes Subsampling}
+\label{fig:test}
+\end{figure}
+
+
+\end{document}
