@@ -1,40 +1,73 @@
 """  
- Welcome to the ORF package!
+ Description
  ---------------------------- 
- In this documentation you will find useful information on how to use the 
- OrderedForest in Python.
+ A Python implementation of the Ordered Forest estimator as developed in 
+ Lechner & Okasa (2019). The Ordered Forest flexibly estimates the conditional 
+ probabilities of models with ordered categorical outcomes (so-called ordered 
+ choice models). Additionally to common machine learning algorithms the `orf`
+ package provides functions for estimating marginal effects as well as 
+ statistical inference thereof and thus provides similar output as in standard 
+ econometric models for ordered choice. The core forest algorithm relies on the
+ fast forest implementations from the `scikit-learn` (Pedregosa et al., 2011) 
+ and `EconML` (Battocchi et al., 2019) libraries. For the R version of the 
+ `orf` package (Lechner & Okasa, 2020), see 
+ [CRAN](https://CRAN.R-project.org/package=orf) repository.
  
- To update documentation go to directory `ORFpy` in Anaconda Prompt and run
- ```
- pdoc --html --config show_source_code=False orf --force
- ```
-
-
-
- What objects are documented? 
+ Installation
  ---------------------------- 
- `pdoc` only extracts _public API_ documentation.[^public] 
- All objects (modules, functions, classes, variables) are only 
- considered public if their _identifiers don't begin with an 
- underscore_ ( \\_ ).[^private] 
-  
- [^public]: 
-     Here, public API refers to the API that is made available 
-     to your project end-users, not the public API e.g. of a 
-     private class that can be reasonably extended elsewhere 
-     by your project developers. 
-  
- [^private]: 
-     Prefixing private, implementation-specific objects with 
-     an underscore is [a common convention]. 
-  
- [a common convention]: https://docs.python.org/3/tutorial/classes.html#private-variables 
-  
- In addition, if a module defines [`__all__`][__all__], then only 
- the identifiers contained in this list will be considered public. 
- Otherwise, a module's global identifiers are considered public 
- only if they don't begin with an underscore and are defined 
- in this exact module (i.e. not imported from somewhere else). 
+ To install the `orf` package run
+ ```
+ pip install orf
+ ```
+ in the terminal.
+
+
+ Examples
+ ---------------------------- 
+ The following examples demonstrate the basic usage of the `orf` package with 
+ default settings for the Ordered Forest estimator.
+ ```
+ # load orf package
+ import orf
+ 
+ # get example data
+ features, outcome  = orf.example_data(seed=123)
+
+ # estimate Ordered Forest with default settings
+ oforest = orf.OrderedForest()
+ oforest.fit(X=features, y=outcome)
+
+ # show summary of the orf estimation
+ oforest.summary()
+
+ # evaluate the prediction performance
+ oforest.performance()
+
+ # plot the estimated probability distributions
+ oforest.plot()
+ 
+ # predict ordered probabilities
+ oforest.predict()
+
+ # evaluate marginal effects
+ oforest.margins()
+ ```
+
+ Authors
+ ---------------------------- 
+ Michael Lechner, Fabian Muny & Gabriel Okasa
+
+ References
+ ---------------------------- 
+ - Battocchi, K., Dillon, E., Hei, M., Lewis, G., Oka, P., Oprescu, M. & 
+ Syrgkanis, V. (2019). EconML: A Python Package for ML-Based Heterogeneous 
+ Treatment Effects Estimation. Version 0.13.0, https://github.com/microsoft/EconML
+ - Lechner, M., & Okasa, G. (2019). Random Forest Estimation of the Ordered 
+ Choice Model. arXiv preprint arXiv:1907.02436. https://arxiv.org/abs/1907.02436
+ - Lechner, M., & Okasa, G. (2020). orf: Ordered Random Forests. 
+ R package version 0.1.3, https://CRAN.R-project.org/package=orf
+ - Pedregosa et al. (2011). Scikit-learn: Machine Learning in Python. JMLR 12, 
+ pp. 2825-2830.
 """
 
 from orf.OrderedForest import OrderedForest

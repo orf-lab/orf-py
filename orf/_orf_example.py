@@ -15,7 +15,7 @@ path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
 os.chdir(path)
 
 # get example data
-features, outcome  = orf.example_data()
+features, outcome  = orf.example_data(seed=123)
 
 # Ordered Forest estimation
 

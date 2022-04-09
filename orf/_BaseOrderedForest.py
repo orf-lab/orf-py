@@ -41,10 +41,10 @@ class BaseOrderedForest(BaseEstimator):
     # define init function
     def __init__(self, n_estimators=1000,
                  min_samples_leaf=5,
-                 max_features=0.3,
-                 replace=True,
+                 max_features=None,
+                 replace=False,
                  sample_fraction=0.5,
-                 honesty=False,
+                 honesty=True,
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
@@ -65,7 +65,7 @@ class BaseOrderedForest(BaseEstimator):
         self.confusion = None
         self.measures = None
 
-    def _input_checks(self):
+    def _input_checks(self, n_features):
         # check and define the input parameters
         n_estimators = self.n_estimators
         min_samples_leaf = self.min_samples_leaf
@@ -109,7 +109,11 @@ class BaseOrderedForest(BaseEstimator):
                              ", got %s" % min_samples_leaf)
 
         # check share of features in splitting
-        if isinstance(max_features, float):
+        if max_features is None:
+            # then set as default np.ceil(np.sqrt(n_features)) for X supplied
+            self.max_features = int(np.ceil(np.sqrt(n_features)))
+        # otherwise if share is supplied check if its admissibe
+        elif isinstance(max_features, float):
             # check if its within (0,1]
             if (max_features > 0 and max_features <= 1):
                 # assign the input value
@@ -118,9 +122,20 @@ class BaseOrderedForest(BaseEstimator):
                 # raise value error
                 raise ValueError("max_features must be within (0,1]"
                                  ", got %s" % max_features)
+        # otherwise check if number supplied if its admissible
+        elif isinstance(max_features, int):
+            # check if its positive and less or equal max n_features
+            if (max_features > 0 and max_features <= n_features):
+                # assign the input value
+                self.max_features = max_features
+            else:
+                # raise value error
+                raise ValueError("max_features must be greater than 0 and less"
+                                 " or equal to total number of features"
+                                 ", got %s" % max_features)
         else:
             # raise value error
-            raise ValueError("max_features must be a float"
+            raise ValueError("max_features must be a float, int or None"
                              ", got %s" % max_features)
 
         # check whether to sample with replacement
@@ -133,19 +148,24 @@ class BaseOrderedForest(BaseEstimator):
                              ", got %s" % replace)
 
         # check subsampling fraction
-        if isinstance(sample_fraction, float):
-            # check if its within (0,1]
-            if (sample_fraction > 0 and sample_fraction <= 1):
-                # assign the input value
-                self.sample_fraction = sample_fraction
+        if self.replace:
+            # if bootstrapping, set the subsampling share to 1
+            self.sample_fraction = 1
+        else:
+            # else if subsampling is being used
+            if isinstance(sample_fraction, float):
+                # check if its within (0,1]
+                if (sample_fraction > 0 and sample_fraction <= 1):
+                    # assign the input value
+                    self.sample_fraction = sample_fraction
+                else:
+                    # raise value error
+                    raise ValueError("sample_fraction must be within (0,1]"
+                                     ", got %s" % sample_fraction)
             else:
                 # raise value error
-                raise ValueError("sample_fraction must be within (0,1]"
+                raise ValueError("sample_fraction must be a float"
                                  ", got %s" % sample_fraction)
-        else:
-            # raise value error
-            raise ValueError("sample_fraction must be a float"
-                             ", got %s" % sample_fraction)
 
         # check whether to implement honesty
         if isinstance(honesty, bool):
@@ -157,19 +177,21 @@ class BaseOrderedForest(BaseEstimator):
                              ", got %s" % honesty)
 
         # check honesty fraction
-        if isinstance(honesty_fraction, float):
-            # check if its within (0,1]
-            if (honesty_fraction > 0 and honesty_fraction < 1):
-                # assign the input value
-                self.honesty_fraction = honesty_fraction
+        if self.honesty:
+            # only relevant if honesty is set, otherwise ignored
+            if isinstance(honesty_fraction, float):
+                # check if its within (0,1]
+                if (honesty_fraction > 0 and honesty_fraction < 1):
+                    # assign the input value
+                    self.honesty_fraction = honesty_fraction
+                else:
+                    # raise value error
+                    raise ValueError("honesty_fraction must be within (0,1)"
+                                     ", got %s" % honesty_fraction)
             else:
                 # raise value error
-                raise ValueError("honesty_fraction must be within (0,1)"
+                raise ValueError("honesty_fraction must be a float"
                                  ", got %s" % honesty_fraction)
-        else:
-            # raise value error
-            raise ValueError("honesty_fraction must be a float"
-                             ", got %s" % honesty_fraction)
 
         # Honesty only possible if replace==False
         if (honesty and replace):
@@ -252,13 +274,18 @@ class BaseOrderedForest(BaseEstimator):
                The fitted estimator.
         """
 
-        self._input_checks()
-        # Use sklearn input checks to allow for multiple types of inputs:
+        # %% Use sklearn input checks to allow for multiple types of inputs:
         # - returns numpy arrays for X and y (no matter which input type)
         # - forces y to be numeric
         X,y = check_X_y(X, y, y_numeric=True, estimator="OrderedForest")
+        # obtain total number of observations
+        self.n_features = _num_features(X)
+        # run input checks for arguments
+        self._input_checks(n_features=self.n_features)
         # Get vector of sorted unique values of y
         y_values = np.unique(y)
+        # obtain total number of observations
+        n_samples = _num_samples(X)
 
         # Get the number of outcome classes
         self.n_class = nclass = len(y_values)
@@ -274,10 +301,6 @@ class BaseOrderedForest(BaseEstimator):
                 # Recode y appropriately
                 y = np.searchsorted(np.unique(y), y)+1
 
-        # obtain total number of observations
-        n_samples = _num_samples(X)
-        # obtain total number of observations
-        self.n_features = _num_features(X)
         # create an empty dictionary to save the forests
         forests = {}
         # create an empty array to save the predictions
@@ -290,7 +313,7 @@ class BaseOrderedForest(BaseEstimator):
         #  create an empty dictionary to save the weights matrices
         weights = {}
 
-        # generate honest estimation sample
+        # %% generate honest estimation sample
         if self.honesty:
             # initialize random state for sample splitting
             subsample_random_state = check_random_state(
@@ -313,7 +336,7 @@ class BaseOrderedForest(BaseEstimator):
             ind_tr = np.arange(n_samples)
             ind_est = None
 
-        # estimate random forest on each class outcome except the last one
+        # %% estimate random forest on each class outcome except the last one
         for class_idx in range(1, nclass, 1):
             # create binary outcome indicator for the outcome in the forest
             outcome_ind = (y_tr <= class_idx) * 1
@@ -517,7 +540,7 @@ class BaseOrderedForest(BaseEstimator):
         # normalize predictions to sum up to 1 after non-negativity correction
         class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
         
-        # Compute variance of predicitons if inference = True
+        # %% Compute variance of predicitons if inference = True
         # outcome need to come from the honest sample here, outcome_binary_est
         if self.inference:
             # prepare honest sample
@@ -546,7 +569,7 @@ class BaseOrderedForest(BaseEstimator):
         else:
             variance = None
 
-        # pack estimated forest and class predictions into output dictionary
+        # %% pack estimated forest and class predictions into output dictionary
         self.forest_ = {'forests': forests,
                         'probs': class_probs,
                         'fitted': fitted,

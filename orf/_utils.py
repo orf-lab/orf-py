@@ -44,8 +44,8 @@ def example_data(seed=None,
     y : ndarray
         The generated outcomes.
 
-
     """
+
     # Set seed
     seed = np.random.default_rng(seed=seed)
     # Draw covariates

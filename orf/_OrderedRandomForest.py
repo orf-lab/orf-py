@@ -31,10 +31,10 @@ class OrderedRandomForest(BaseOrderedForest):
     # define init function
     def __init__(self, n_estimators=1000,
                  min_samples_leaf=5,
-                 max_features=0.3,
-                 replace=True,
+                 max_features=None,
+                 replace=False,
                  sample_fraction=0.5,
-                 honesty=False,
+                 honesty=True,
                  honesty_fraction=0.5,
                  inference=False,
                  n_jobs=-1,
