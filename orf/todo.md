@@ -5,8 +5,6 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 ## To Do:
 
 - run code analysis and adjust accordingly (G)
-- API reference in Python (F)
-- add examples to docstrings and check attributes vs. returns, and check argument descriptions (F)
 
 - 'codeY typo in R package descirption of the orf function (G)
 - check how to handle categorical variables in R (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)
@@ -17,6 +15,8 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Done:
 
+- API reference in Python (F)
+- add examples to docstrings and check attributes vs. returns, and check argument descriptions (F)
 - complete documentation (docstrings) based on R package (G)
 - synchronise defaults with R (G)
 - added parallelization option to scikit-learn and econml forest building (G)

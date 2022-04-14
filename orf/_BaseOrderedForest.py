@@ -101,12 +101,24 @@ class BaseOrderedForest(BaseEstimator):
                 self.min_samples_leaf = min_samples_leaf
             else:
                 # raise value error
-                raise ValueError("min_samples_leaf must be at least 1"
-                                 ", got %s" % min_samples_leaf)
+                raise ValueError("min_samples_leaf must be an integer >= 1 or "
+                                 "a float within (0,1), got %s" 
+                                 % min_samples_leaf)
+        elif isinstance(min_samples_leaf, float):
+            # check if its at least 1
+            if (min_samples_leaf > 0 and min_samples_leaf < 1):
+                # assign the input value
+                self.min_samples_leaf = min_samples_leaf
+            else:
+                # raise value error
+                raise ValueError("min_samples_leaf must be an integer >= 1 or "
+                                 "a float within (0,1), got %s" 
+                                 % min_samples_leaf)
         else:
             # raise value error
-            raise ValueError("min_samples_leaf must be an integer"
-                             ", got %s" % min_samples_leaf)
+            raise ValueError("min_samples_leaf must be an integer >= 1 or "
+                             "a float within (0,1), got %s" 
+                             % min_samples_leaf)
 
         # check share of features in splitting
         if max_features is None:
@@ -260,18 +272,6 @@ class BaseOrderedForest(BaseEstimator):
     def fit(self, X, y):
         """
         OrderedForest estimation.
-
-        Parameters
-        ----------
-        X : array-like
-            The matrix of covariates.
-        y : ndarray
-            Vector of outcomes.
-
-        Returns
-        -------
-        self : object
-               The fitted estimator.
         """
 
         # %% Use sklearn input checks to allow for multiple types of inputs:

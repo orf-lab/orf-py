@@ -8,10 +8,13 @@
  package provides functions for estimating marginal effects as well as 
  statistical inference thereof and thus provides similar output as in standard 
  econometric models for ordered choice. The core forest algorithm relies on the
- fast forest implementations from the `scikit-learn` (Pedregosa et al., 2011) 
- and `EconML` (Battocchi et al., 2019) libraries. For the R version of the 
+ fast forest implementations from the 
+ [`scikit-learn`](https://scikit-learn.org/stable/){:target="_blank"} 
+ (Pedregosa et al., 2011) and 
+ [`EconML`](https://econml.azurewebsites.net/){:target="_blank"} 
+ (Battocchi et al., 2019) libraries. For the R version of the 
  `orf` package (Lechner & Okasa, 2020), see 
- [CRAN](https://CRAN.R-project.org/package=orf) repository.
+ [CRAN](https://CRAN.R-project.org/package=orf){:target="_blank"} repository.
  
  Installation
  ---------------------------- 
@@ -24,6 +27,7 @@
 
  Examples
  ---------------------------- 
+ 
  The following examples demonstrate the basic usage of the `orf` package with 
  default settings for the Ordered Forest estimator.
  ```

@@ -60,22 +60,6 @@ class OrderedRandomForest(BaseOrderedForest):
         """
         OrderedForest prediction.
 
-        Parameters
-        ----------
-        X : array-like or NoneType
-            Matrix of new covariates or None if covariates from
-            fit function should be used. If new data provided it must have
-            the same number of features as the X in the fit function.
-        prob : bool
-            Should the ordered probabilities be predicted? If False, ordered 
-            classes will be predicted instead. Default is True.
-
-        Returns
-        -------
-        result : dict
-                 Dictionary containing prediction results. Use 
-                 result.get("predictions") to extract array of predictions and
-                 result.get("variances") to extract array of variances.
         """
 
         # Input checks
@@ -963,7 +947,8 @@ class OrderedRandomForest(BaseOrderedForest):
             print('-' * 60)
         
         elif item['output']=='margin':
-            string_seq_X = [str(x) for x in np.arange(1,self.n_features+1)]
+            string_seq_X = [str(x) for x in np.arange(1,np.shape(
+                item['effects'])[0]+1)]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
             print('-' * 60, 
                   'Summary of the OrderedForest marginal effects',
@@ -1101,12 +1086,12 @@ class OrderedRandomForest(BaseOrderedForest):
         check_is_fitted(self, attributes=["forest_"])
         # print the result
         print('Prediction Performance of OrderedForest', '-' * 80,
-              self.measures, '-' * 80, '\n\n', sep='\n')
+              self.measures, '-' * 80, '\n', sep='\n')
 
         # print the confusion matrix
         print('Confusion Matrix for OrderedForest', '-' * 80,
               '                         Predictions ', '-' * 80,
-              self.confusion, '-' * 80, '\n\n', sep='\n')
+              self.confusion, '-' * 80, '\n', sep='\n')
 
         # empty return
         return None

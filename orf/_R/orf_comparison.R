@@ -7,10 +7,10 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 path <- getwd()
 
 # load packages
-library(orf)
 library(ggplot2)
 library(tidyverse)
 library(stevedata)
+library(orf)
 
 # ---------------------------------------------------------------------------- #
 

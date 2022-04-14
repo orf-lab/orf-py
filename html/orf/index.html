@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.8.1" />
 <title>orf API documentation</title>
-<meta name="description" content="Welcome to the ORF package!
-In this documentation you will find useful information on how to use the
-OrderedForest in Python …" />
+<meta name="description" content="Description
+A Python implementation of the Ordered Forest estimator as developed in
+Lechner &amp; Okasa (2019). The Ordered Forest flexibly estimates …" />
 <link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
 <link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
@@ -22,37 +22,68 @@ OrderedForest in Python …" />
 <h1 class="title">Package <code>orf</code></h1>
 </header>
 <section id="section-intro">
-<h2 id="welcome-to-the-orf-package">Welcome to the ORF package!</h2>
-<p>In this documentation you will find useful information on how to use the
-OrderedForest in Python.</p>
-<p>To update documentation go to directory <code>ORFpy</code> in Anaconda Prompt and run</p>
-<pre><code>pdoc --html --config show_source_code=False orf --force
+<h2 id="description">Description</h2>
+<p>A Python implementation of the Ordered Forest estimator as developed in
+Lechner &amp; Okasa (2019). The Ordered Forest flexibly estimates the conditional
+probabilities of models with ordered categorical outcomes (so-called ordered
+choice models). Additionally to common machine learning algorithms the <code><a title="orf" href="#orf">orf</a></code>
+package provides functions for estimating marginal effects as well as
+statistical inference thereof and thus provides similar output as in standard
+econometric models for ordered choice. The core forest algorithm relies on the
+fast forest implementations from the
+<a href="https://scikit-learn.org/stable/" target="_blank"><code>scikit-learn</code></a>
+(Pedregosa et al., 2011) and
+<a href="https://econml.azurewebsites.net/" target="_blank"><code>EconML</code></a>
+(Battocchi et al., 2019) libraries. For the R version of the
+<code><a title="orf" href="#orf">orf</a></code> package (Lechner &amp; Okasa, 2020), see
+<a href="https://CRAN.R-project.org/package=orf" target="_blank">CRAN</a> repository.</p>
+<h2 id="installation">Installation</h2>
+<p>To install the <code><a title="orf" href="#orf">orf</a></code> package run</p>
+<pre><code>pip install orf
 </code></pre>
-<h2 id="what-objects-are-documented">What objects are documented?</h2>
-<p><code>pdoc</code> only extracts <em>public API</em> documentation.<sup id="fnref:public"><a class="footnote-ref" href="#fn:public">1</a></sup>
-All objects (modules, functions, classes, variables) are only
-considered public if their <em>identifiers don't begin with an
-underscore</em> ( _ ).<sup id="fnref:private"><a class="footnote-ref" href="#fn:private">2</a></sup> </p>
-<p>In addition, if a module defines [<code>__all__</code>][<strong>all</strong>], then only
-the identifiers contained in this list will be considered public.
-Otherwise, a module's global identifiers are considered public
-only if they don't begin with an underscore and are defined
-in this exact module (i.e. not imported from somewhere else).</p>
-<div class="footnote">
-<hr>
-<ol>
-<li id="fn:public">
-<p>Here, public API refers to the API that is made available
-to your project end-users, not the public API e.g. of a
-private class that can be reasonably extended elsewhere
-by your project developers.&#160;<a class="footnote-backref" href="#fnref:public" title="Jump back to footnote 1 in the text">&#8617;</a></p>
-</li>
-<li id="fn:private">
-<p>Prefixing private, implementation-specific objects with
-an underscore is <a href="https://docs.python.org/3/tutorial/classes.html#private-variables">a common convention</a>.&#160;<a class="footnote-backref" href="#fnref:private" title="Jump back to footnote 2 in the text">&#8617;</a></p>
-</li>
-</ol>
-</div>
+<p>in the terminal.</p>
+<h2 id="examples">Examples</h2>
+<p>The following examples demonstrate the basic usage of the <code><a title="orf" href="#orf">orf</a></code> package with
+default settings for the Ordered Forest estimator.</p>
+<pre><code># load orf package
+import orf
+
+# get example data
+features, outcome  = orf.example_data(seed=123)
+
+# estimate Ordered Forest with default settings
+oforest = orf.OrderedForest()
+oforest.fit(X=features, y=outcome)
+
+# show summary of the orf estimation
+oforest.summary()
+
+# evaluate the prediction performance
+oforest.performance()
+
+# plot the estimated probability distributions
+oforest.plot()
+
+# predict ordered probabilities
+oforest.predict()
+
+# evaluate marginal effects
+oforest.margins()
+</code></pre>
+<h2 id="authors">Authors</h2>
+<p>Michael Lechner, Fabian Muny &amp; Gabriel Okasa</p>
+<h2 id="references">References</h2>
+<ul>
+<li>Battocchi, K., Dillon, E., Hei, M., Lewis, G., Oka, P., Oprescu, M. &amp;
+Syrgkanis, V. (2019). EconML: A Python Package for ML-Based Heterogeneous
+Treatment Effects Estimation. Version 0.13.0, <a href="https://github.com/microsoft/EconML">https://github.com/microsoft/EconML</a></li>
+<li>Lechner, M., &amp; Okasa, G. (2019). Random Forest Estimation of the Ordered
+Choice Model. arXiv preprint arXiv:1907.02436. <a href="https://arxiv.org/abs/1907.02436">https://arxiv.org/abs/1907.02436</a></li>
+<li>Lechner, M., &amp; Okasa, G. (2020). orf: Ordered Random Forests.
+R package version 0.1.3, <a href="https://CRAN.R-project.org/package=orf">https://CRAN.R-project.org/package=orf</a></li>
+<li>Pedregosa et al. (2011). Scikit-learn: Machine Learning in Python. JMLR 12,
+pp. 2825-2830.</li>
+</ul>
 </section>
 <section>
 </section>
@@ -62,29 +93,32 @@ an underscore is <a href="https://docs.python.org/3/tutorial/classes.html#privat
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="orf.example_data"><code class="name flex">
-<span>def <span class="ident">example_data</span></span>(<span>seed=None, n_samples=1000, p_cont=1, p_cat=1, p_binary=1, noise=True, y_classes=3, cat_classes=3)</span>
+<span>def <span class="ident">example_data</span></span>(<span>n_samples=1000, y_classes=3, p_cont=1, p_cat=1, cat_classes=3, p_binary=1, noise=True, seed=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Generate example data for OrderedForest.</p>
+<div class="desc"><p>Generate example data for Ordered Forest estimation.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>seed</code></strong> :&ensp;<code>integer</code> or <code>NoneType</code></dt>
-<dd>Set seed for reproducability.</dd>
 <dt><strong><code>n_samples</code></strong> :&ensp;<code>integer</code></dt>
-<dd>The number of observations.</dd>
+<dd>The number of observations. The default is 1000.</dd>
+<dt><strong><code>y_classes</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of classes of the outcome variable. The default is 3.</dd>
 <dt><strong><code>p_cont</code></strong> :&ensp;<code>integer</code></dt>
-<dd>The number of continuous covariates drawn from a normal distribution.</dd>
+<dd>The number of continuous covariates drawn from a normal distribution.
+The default is 1.</dd>
 <dt><strong><code>p_cat</code></strong> :&ensp;<code>integer</code></dt>
-<dd>The number of categorical covariates drawn from a binomial distribution.</dd>
+<dd>The number of categorical covariates drawn from a binomial
+distribution. The default is 1.</dd>
+<dt><strong><code>cat_classes</code></strong> :&ensp;<code>integer</code></dt>
+<dd>The number of classes of the categorical variable(s). The default is 3.</dd>
 <dt><strong><code>p_binary</code></strong> :&ensp;<code>integer</code></dt>
-<dd>The number of binary covariates drawn from a binomial distribution.</dd>
+<dd>The number of binary covariates drawn from a binomial distribution.
+The default is 1.</dd>
 <dt><strong><code>noise</code></strong> :&ensp;<code>boolean</code></dt>
 <dd>Whether to include a continuous noise variable that does not influence
 the outcome. The default is True.</dd>
-<dt><strong><code>y_classes</code></strong> :&ensp;<code>integer</code></dt>
-<dd>The number of classes of the outcome variable. The default is 3.</dd>
-<dt><strong><code>cat_classes</code></strong> :&ensp;<code>integer</code></dt>
-<dd>The number of classes of the categorical variable(s). The default is 3.</dd>
+<dt><strong><code>seed</code></strong> :&ensp;<code>integer</code> or <code>NoneType</code></dt>
+<dd>Set seed for reproducability. The default is None.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
@@ -92,7 +126,23 @@ the outcome. The default is True.</dd>
 <dd>The generated covariates/features.</dd>
 <dt><strong><code>y</code></strong> :&ensp;<code>ndarray</code></dt>
 <dd>The generated outcomes.</dd>
-</dl></div>
+</dl>
+<h2 id="notes">Notes</h2>
+<p>This functions generates an example dataset of size <code>n_sample</code>, consisting
+of an ordered outcome variable with <code>y_classes</code> classes and an array of
+features of different types. The data-generating process (DGP) may include
+continuous (<code>p_cont</code>), binary (<code>p_binary</code>) and categorical (<code>p_cat</code>)
+features. In addition, it is possible to include random noise in the
+outcome variable by specifying <code>noise=True</code>. </p>
+<h2 id="example">Example</h2>
+<pre><code class="language-py"># load orf package
+import orf
+
+# generate dataset consisting of 2000 observations and 4 outcome classes
+features, outcome  = orf.example_data(n_samples=2000,
+                                      y_classes=4,
+                                      seed=123)
+</code></pre></div>
 </dd>
 </dl>
 </section>
@@ -101,57 +151,160 @@ the outcome. The default is True.</dd>
 <dl>
 <dt id="orf.OrderedForest"><code class="flex name class">
 <span>class <span class="ident">OrderedForest</span></span>
-<span>(</span><span>n_estimators=1000, min_samples_leaf=5, max_features=0.3, replace=True, sample_fraction=0.5, honesty=False, honesty_fraction=0.5, inference=False, n_jobs=-1, pred_method='numpy_joblib', weight_method='numpy_loop_shared_joblib', random_state=None)</span>
+<span>(</span><span>n_estimators=1000, min_samples_leaf=5, max_features=None, replace=False, sample_fraction=0.5, honesty=True, honesty_fraction=0.5, inference=False, n_jobs=-1, random_state=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Ordered Random Forests class labeled 'OrderedForest'.</p>
-<p>includes methods to fit the model, predict and estimate marginal effects.</p>
+<div class="desc"><p>Ordered Random Forests class labeled <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>. Initializes
+parameters for estimation.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>n_estimators</code></strong> :&ensp;<code>integer</code></dt>
-<dd>Number of trees in the forest. The default is 1000.</dd>
-<dt><strong><code>min_samples_leaf</code></strong> :&ensp;<code>integer</code></dt>
-<dd>Minimum leaf size in the forest. The default is 5.</dd>
-<dt><strong><code>max_features</code></strong> :&ensp;<code>float</code></dt>
-<dd>Share of random covariates (0,1). The default is 0.3.</dd>
+<dt><strong><code>n_estimators</code></strong> :&ensp;<code>int</code></dt>
+<dd>The number of trees in the forest. The default is 1000.</dd>
+<dt><strong><code>min_samples_leaf</code></strong> :&ensp;<code>int</code></dt>
+<dd>
+<p>The minimum number of samples required to be at a leaf node. A split
+point at any depth will only be considered if it leaves at least
+<code>min_samples_leaf</code> training samples in each of the left and right
+branches. This may have the effect of smoothing the model.</p>
+<ul>
+<li>If int, then consider <code>min_samples_leaf</code> as the minimum number.</li>
+<li>If float, then <code>min_samples_leaf</code> is a fraction and
+<code>ceil(min_samples_leaf * n_samples)</code> are the minimum number of
+samples for each node.</li>
+</ul>
+<p>The default is 5.</p>
+</dd>
+<dt><strong><code>max_features</code></strong> :&ensp;<code>float, int</code> or <code>NoneType</code></dt>
+<dd>
+<p>The number of features to consider when looking for the best split:</p>
+<ul>
+<li>If int, then consider <code>max_features</code> features at each split.</li>
+<li>If float, then <code>max_features</code> is a fraction and
+<code>round(max_features * n_features)</code> features are considered at each
+split.</li>
+<li>If None, then <code>max_features=ceil(sqrt(n_features))</code>.</li>
+</ul>
+<p>Note: the search for a split does not stop until at least one valid
+partition of the node samples is found, even if it requires to
+effectively inspect more than <code>max_features</code> features.</p>
+<p>The default is None.</p>
+</dd>
 <dt><strong><code>replace</code></strong> :&ensp;<code>bool</code></dt>
-<dd>If True sampling with replacement, i.e. bootstrap is used
+<dd>If True, sampling with replacement (i.e. bootstrap) is used
 to grow the trees, otherwise subsampling without replacement is used.
-The default is False.</dd>
+For bootstrap the core forest algorithm is based on
+<a href="https://scikit-learn.org/stable/" target="_blank"><code>scikit-learn</code></a>
+while <a href="https://econml.azurewebsites.net/" target="_blank"><code>EconML</code></a>
+is used for subsampling without replacement. The default is False.</dd>
 <dt><strong><code>sample_fraction</code></strong> :&ensp;<code>float</code></dt>
 <dd>Subsampling rate, i.e. the share of samples to draw from
-X to train each tree. The default is 0.5.</dd>
+the training data to build each tree. The default is 0.5.</dd>
 <dt><strong><code>honesty</code></strong> :&ensp;<code>bool</code></dt>
 <dd>If True honest forest is built using sample splitting.
-The default is False.</dd>
+The default is True.</dd>
 <dt><strong><code>honesty_fraction</code></strong> :&ensp;<code>float</code></dt>
 <dd>Share of observations belonging to honest sample not used
 for growing the forest. The default is 0.5.</dd>
 <dt><strong><code>inference</code></strong> :&ensp;<code>bool</code></dt>
-<dd>If True the weight based inference is conducted. The
+<dd>If True, weight-based inference (i.e. variance estimation and
+uncertainty quantification of the estimates) is conducted. The
 default is False.</dd>
 <dt><strong><code>n_jobs</code></strong> :&ensp;<code>int</code> or <code>None</code></dt>
-<dd>The number of parallel jobs to be used for parallelism;
-follows joblib semantics. <code>n_jobs=-1</code> means all - 1 available cpu cores.
-<code>n_jobs=None</code> means no parallelism. There is no parallelism implemented
-for <code>pred_method='numpy'</code>. The default is -1.</dd>
-<dt><strong><code>pred_method</code></strong> :&ensp;<code>str</code></dt>
-<dd>Which method to use to compute honest predictions, one of <code>'cython'</code>,
-<code>'loop'</code>, <code>'numpy'</code>, <code>'numpy_loop'</code>, <code>'numpy_loop_multi'</code>,
-<code>'numpy_loop_mpire'</code> or <code>'numpy_sparse'</code>. The
-default is <code>'numpy_loop_mpire'</code>.</dd>
-<dt><strong><code>weight_method</code></strong> :&ensp;<code>str</code></dt>
-<dd>Which method to use to compute honest weights, one of <code>'numpy_loop'</code>,
-<code>'numpy_loop_mpire'</code>, <code>numpy_loop_multi'</code>, <code>numpy_loop_shared_multi</code>
-or <code>numpy_loop_shared_mpire</code>. The default is
-<code>'numpy_loop_shared_mpire'</code>.</dd>
+<dd>
+<p>The number of parallel jobs to be used for multithreading in
+<a href="#orf.OrderedForest.fit"><code>.fit()</code></a>,
+<a href="#orf.OrderedForest.predict"><code>.predict()</code></a> and
+<a href="#orf.OrderedForest.margins"><code>.margins()</code></a>.
+Follows
+<a href="https://joblib.readthedocs.io" target="_blank"><code>joblib</code></a> semantics:</p>
+<ul>
+<li><code>n_jobs=-1</code> means all - 1 available cpu cores.</li>
+<li><code>n_jobs=None</code> and <code>n_jobs=1</code> means no parallelism. </li>
+</ul>
+<p>The default is -1.</p>
+</dd>
 <dt><strong><code>random_state</code></strong> :&ensp;<code>int, None</code> or <code>numpy.random.RandomState object</code></dt>
 <dd>Random seed used to initialize the pseudo-random number
-generator. The default is None. See <strong><a href="https://numpy.org/doc/stable/reference/random/legacy.html" target="_blank">numpy documentation</a></strong>
-for details.</dd>
+generator. See
+<a href="https://numpy.org/doc/stable/reference/random/legacy.html" target="_blank"><code>numpy</code> documentation</a>
+for details. The default is None.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>None. Initializes parameters for OrderedForest.</p></div>
+<p>None. Initializes parameters for OrderedForest.</p>
+<h2 id="notes">Notes</h2>
+<p><code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code> includes methods to <a href="#orf.OrderedForest.fit"><code>.fit()</code></a>
+the model, <a href="#orf.OrderedForest.predict"><code>.predict()</code></a> the probabilities
+and evaluate marginal effects via
+<a href="#orf.OrderedForest.margins"><code>.margins()</code></a>. Furthermore,
+it provides functions to interpret the estimation outputs such as
+<a href="#orf.OrderedForest.summary"><code>.summary()</code></a>,
+<a href="#orf.OrderedForest.plot"><code>.plot()</code></a> and
+<a href="#orf.OrderedForest.performance"><code>.performance()</code></a>.</p>
+<p>The Ordered Forest estimates the conditional ordered choice probabilities,
+i.e. <code>P[Y=m|X=x]</code>. Additionally, weight-based inference for the probability
+predictions can be conducted as well. If inference is desired, the Ordered
+Forest must be estimated with honesty and subsampling. If prediction only
+is desired, estimation without honesty and with bootstrapping is
+recommended for optimal prediction performance.</p>
+<p>In order to estimate the Ordered Forest users must supply the data in form
+of array-like matrix of features <code>X</code> and array-like vector of outcomes <code>y</code>
+to the <a href="#orf.OrderedForest.fit"><code>.fit()</code></a>
+function. These data inputs are also the only inputs that
+must be specified by the user without any defaults. Further optional
+arguments for the <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code> class include the classical forest
+hyperparameters such as number of trees, <code>n_estimators</code>, number of randomly
+selected features at split, <code>max_features</code>, and the minimum leaf size,
+<code>min_samples_leaf</code>. The forest building scheme is regulated by the
+<code>replace</code> argument, meaning bootstrapping if <code>replace=True</code> or subsampling
+if <code>replace=False</code>. For the case of subsampling, the <code>sample_fraction</code>
+argument regulates the subsampling rate. Further, an honest forest is
+estimated if the <code>honesty</code> argument is set to <code>True</code>, which is also the
+default. Similarly, the fraction of the sample used for the honest
+estimation is regulated by the <code>honesty_fraction</code> argument. The default
+setting conducts a 50:50 sample split, which is also generally advised to
+follow for optimal performance. The inference procedure of the Ordered
+Forest is based on the forest weights and is controlled by the <code>inference</code>
+argument. Note, that such weight-based inference is a computationally
+demanding exercise due to the estimation of the forest weights and as such
+longer computation time is to be expected. To speed up the estimations
+<code>n_jobs</code> provides option for multithreading from the<br>
+<a href="https://joblib.readthedocs.io" target="_blank"><code>joblib</code></a> library.
+Lastly, the <code>random_state</code> argument allows to set the seed for
+replicability.</p>
+<p>For further details, see examples below.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load orf package
+import orf
+
+# initialize Ordered Forest with default parameters
+oforest = orf.OrderedForest()
+
+# initialize Ordered Forest with own tuning parameters
+oforest = orf.OrderedForest(n_estimators = 2000, min_samples_leaf = 10,
+                            max_features = 3)
+
+# initialize Ordered Forest with bootstrapping and without honesty
+oforest = orf.OrderedForest(replace = True, honesty = False)
+
+# initialize Ordered Forest with subsampling and with honesty
+oforest = orf.OrderedForest(replace = False, honesty = True)
+
+# initialize Ordered Forest with subsampling and with honesty
+# with own tuning for subsample fraction and honesty fraction
+oforest = orf.OrderedForest(replace = False, sample_fraction = 0.5,
+                            honesty = True, honesty_fraction = 0.5)
+
+# initialize Ordered Forest with subsampling, honesty and 
+# inference (for inference, subsampling and honesty are required)
+oforest = orf.OrderedForest(replace = False, honesty = True,
+                            inference = True)
+
+# initialize Ordered Forest with all custom settings
+oforest = orf.OrderedForest(n_estimators = 2000, min_samples_leaf = 10,
+                            max_features = 3, replace = True,
+                            sample_fraction = 1, honesty = False,
+                            honesty.fraction = 0, inference = False)    
+</code></pre></div>
 <h3>Ancestors</h3>
 <ul class="hlist">
 <li>orf._OrderedRandomForest.OrderedRandomForest</li>
@@ -164,44 +317,79 @@ for details.</dd>
 <span>def <span class="ident">fit</span></span>(<span>self, X, y)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>OrderedForest estimation.</p>
+<div class="desc"><p>Estimation of the ordered choice model via the Ordered Forest
+estimator of class <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code></dt>
-<dd>The matrix of covariates.</dd>
-<dt><strong><code>y</code></strong> :&ensp;<code>ndarray</code></dt>
-<dd>Vector of outcomes.</dd>
+<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code> of <code>shape (n_samples, n_features)</code></dt>
+<dd>The training input samples (i.e. the matrix of covariates).
+Internally, its dtype will be converted to <code>dtype=np.float32</code>.</dd>
+<dt><strong><code>y</code></strong> :&ensp;<code>array-like</code> of <code>shape (n_samples,)</code></dt>
+<dd>The ordinal outcome values as integers ranging from <code>1</code> up to
+<code>nclass</code></dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>self</code></strong> :&ensp;<code>object</code></dt>
 <dd>The fitted estimator.</dd>
 </dl>
-<h2 id="example">Example</h2>
-<pre><code># import modules
-import pandas as pd
-import os
-import numpy as np
+<h2 id="notes">Notes</h2>
+<p><a href="#orf.OrderedForest.fit"><code>.fit()</code></a> estimates the ordered choice model
+via the Ordered Forest estimator and outputs the conditional ordered
+choice probabilities, i.e. <code>P[Y=m|X=x]</code>. The user must supply the data
+in form of array-like matrix of features <code>X</code> and array-like vector of
+outcomes <code>y</code> of ordered classes.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load orf package
+import orf
 
-# load the ordered forest
-from orf.OrderedForest import OrderedForest
+# get example data
+features, outcome  = orf.example_data(seed=123)
 
-# read in example data from the orf package in R
-odata = pd.read_csv('orf/odata.csv')
+# initialize Ordered Forest with default parameters
+oforest = orf.OrderedForest()
+# estimate Ordered Forest
+oforest.fit(X=features, y=outcome)
 
-# define outcome and features
-outcome = odata['Y']
-features = odata.drop('Y', axis=1)
+# initialize Ordered Forest with own tuning parameters
+oforest = orf.OrderedForest(n_estimators = 2000, 
+                            min_samples_leaf = 10,
+                            max_features = 3)
+# estimate Ordered Forest
+oforest.fit(X=features, y=outcome)
 
-# Initiate the class with tuning parameters
-oforest = OrderedRandomForest(n_estimators=1000, min_samples_leaf=5,
-                              max_features=0.3, replace=False,
-                              sample_fraction=0.5, honesty=True,
-                              n_jobs=-1, pred_method='numpy_loop',
-                              weight_method='numpy_loop',
-                              inference=True)
+# initialize Ordered Forest with bootstrapping and without honesty
+oforest = orf.OrderedForest(replace = True, honesty = False)
+# estimate Ordered Forest
+oforest.fit(X=features, y=outcome)
 
-# OrderedForest estimation
+# initialize Ordered Forest with subsampling and with honesty
+oforest = orf.OrderedForest(replace = False, honesty = True)
+# estimate Ordered Forest
+oforest.fit(X=features, y=outcome)
+
+# initialize Ordered Forest with subsampling and with honesty
+# with own tuning for subsample fraction and honesty fraction
+oforest = orf.OrderedForest(replace = False, sample_fraction = 0.5,
+                            honesty = True, honesty_fraction = 0.5)
+# estimate Ordered Forest
+oforest.fit(X=features, y=outcome)
+
+# initialize Ordered Forest with subsampling, honesty and 
+# inference (for inference, subsampling and honesty are required)
+oforest = orf.OrderedForest(replace = False, honesty = True,
+                            inference = True)
+# estimate Ordered Forest
+oforest.fit(X=features, y=outcome)
+
+# initialize Ordered Forest with all custom settings
+oforest = orf.OrderedForest(n_estimators = 2000,
+                            min_samples_leaf = 10,
+                            max_features = 3, replace = True,
+                            sample_fraction = 1, honesty = False,
+                            honesty.fraction = 0,
+                            inference = False)    
+# estimate Ordered Forest
 oforest.fit(X=features, y=outcome)
 </code></pre></div>
 </dd>
@@ -209,13 +397,15 @@ oforest.fit(X=features, y=outcome)
 <span>def <span class="ident">margins</span></span>(<span>self, X=None, X_cat=None, X_eval=None, eval_point='mean', window=0.1, verbose=True)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>OrderedForest marginal effects.</p>
+<div class="desc"><p>Evaluation of marginal effects based on the estimated Ordered Forest
+of class <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code> or <code>NoneType</code></dt>
-<dd>Matrix of new covariates or None if covariates from
-fit function should be used. If new data provided it must have
-the same number of features as the <code>X</code> in the fit function.</dd>
+<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code> of <code>shape (n_samples, n_features)</code> or <code>NoneType</code></dt>
+<dd>Matrix of new features/covariates or <code>None</code> if covariates from
+fit function should be used. If new data provided, it must have
+the same number of features as the <code>X</code> in the
+<a href="#orf.OrderedForest.fit"><code>.fit()</code></a> function.</dd>
 <dt><strong><code>X_cat</code></strong> :&ensp;<code>list</code> or <code>tuple</code> or <code>NoneType</code></dt>
 <dd>List or tuple indicating the columns with categorical covariates,
 i.e. <code>X_cat=(1,)</code> or <code>X_cat=[1]</code> if the second column includes
@@ -224,85 +414,286 @@ and less than 10 unique values are considered to be categorical as
 default.</dd>
 <dt><strong><code>X_eval</code></strong> :&ensp;<code>list</code> or <code>tuple</code> or <code>NoneType</code></dt>
 <dd>List or tuple indicating the columns with covariates for which the,
-marginal effect should be evaluated, i.e. <code>X_eval=(1,)</code> or <code>X_eval=[1]</code>
-if the effect for the covariate in the column should be evaluated.
-This can significantly speed up the computations. If not defined,
-all covariates are considered as default.</dd>
+marginal effect should be evaluated, i.e. <code>X_eval=(1,)</code> or
+<code>X_eval=[1]</code> if the effect for the covariate in the column should
+be evaluated. This can significantly speed up the computations.
+If not defined, all covariates are considered as default.</dd>
 <dt><strong><code>eval_point</code></strong> :&ensp;<code>string</code></dt>
-<dd>Defining evaluation point for marginal effects. These
-can be one of "mean", "atmean", or "atmedian". Default is "mean".</dd>
+<dd>Defining evaluation point for marginal effects. This can be one
+of <code>"mean"</code>, <code>"atmean"</code>, or <code>"atmedian"</code>. The default is <code>"mean"</code>.</dd>
 <dt><strong><code>window</code></strong> :&ensp;<code>float</code></dt>
-<dd>Share of standard deviation of X to be used for
-evaluation of the marginal effect. Default is 0.1.</dd>
+<dd>The share of the standard deviation of <code>X</code> to be used for
+evaluation of the marginal effect. The default is <code>0.1</code>.</dd>
 <dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code></dt>
-<dd>Should the results printed to console? Default is True.</dd>
+<dd>Should the results printed to console? The default is True.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>result</code></strong> :&ensp;<code>dict</code></dt>
 <dd>Dictionary containing results of marginal effects estimation.
 Use <code>result.get("...")</code> with <code>"effects"</code>, <code>"variances"</code>,
-<code>"std_errors"</code>, <code>"t-values"</code> or <code>"p-values"</code> to extract arrays
-of marginal effects, variances, standard errors, t-values or
-p-values, respectively.</dd>
-</dl></div>
+<code>"std_errors"</code>, <code>"t-values"</code>, <code>"p-values"</code>, <code>"ci-up"</code> or
+<code>"ci-down"</code> to extract arrays of marginal effects, variances,
+standard errors, t-values, p-values or upper and lower
+confidence intervals, respectively. All of these arrays are
+of shape <code>(n_samples, nclass)</code>.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p><a href="#orf.OrderedForest.margins"><code>.margins()</code></a> evaluates marginal effects
+at the mean, at the median, or the mean marginal effects, depending
+on the <code>eval_point</code> argument. For a greater flexibility in the marginal
+effects comptation, the argument <code>X_eval</code> controls for which features
+the marginal effects should be evaluated. If not defined, the marginal
+effects of all features are computed which might be computationally
+expensive. Additionally, the evaluation window for the marginal effects
+can be regulated through the <code>window</code> argument. Furthermore, the user
+might specify which features/covariates should be explicitly handled
+as categorical via the <code>X_cat</code> argument. Moreover, new test data for
+which marginal effects should be evaluated can be supplied via the <code>X</code>
+argument as long as it lies within the support of the training <code>X</code>
+data. In addition to the estimation of the marginal effects, the
+weight-based inference for the effects is supported as well, this is
+inherited from the <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code> class arguments. Note, that the
+inference procedure is a computationally exhausting exercise
+due to the computation of the forest weights. It is advised to increase
+the number of subsampling replications in the supplied <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>
+object as the estimation of the marginal effects is a more demanding
+exercise than a simple Ordered Forest estimation/prediction.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load packages
+import orf
+
+# get example data
+features, outcome  = orf.example_data(seed=123)
+
+# estimate Ordered Forest
+oforest = orf.OrderedForest().fit(X=features, y=outcome)
+
+# estimate default (mean) marginal effects for all features
+marg = oforest.margins()
+
+# return mean marginal effects as array
+print(marg.get(&quot;effects&quot;))
+
+# estimate mean marginal effects, explicitly defining the second
+# column of the features as categorical
+marg = oforest.margins(X_cat=[1])
+
+# estimate mean marginal effects for the first and third column of X
+marg = oforest.margins(X_eval=[0,2])
+
+# estimate marginal effects at the mean and at the median
+marg_atmean = oforest.margins(eval_point=&quot;atmean&quot;)
+marg_atmedian = oforest.margins(eval_point=&quot;atmedian&quot;)
+
+# estimate Ordered Forest using inference
+oforest = orf.OrderedForest(inference=True).fit(X=features, y=outcome)
+
+# estimate mean marginal effects for the first column of X
+marg = oforest.margins(X_eval=[0])
+
+# return marginal effects as array
+print(marg.get(&quot;effects&quot;))
+# return variances as array
+print(marg.get(&quot;variances&quot;))
+# return standard errors as array
+print(marg.get(&quot;std_errors&quot;))
+# return t-values as array
+print(marg.get(&quot;t-values&quot;))
+# return p-values as array
+print(marg.get(&quot;p-values&quot;))
+# return upper confidence intervals as array
+print(marg.get(&quot;ci-up&quot;))
+# return lower confidence intervals as array
+print(marg.get(&quot;ci-down&quot;))
+</code></pre></div>
 </dd>
 <dt id="orf.OrderedForest.performance"><code class="name flex">
 <span>def <span class="ident">performance</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Print the prediction performance based on MSE, RPS and CA.</p>
+<div class="desc"><p>Print the prediction performance of the Ordered Forest object of class
+<code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>.</p>
 <h2 id="parameters">Parameters</h2>
 <p>None.</p>
 <h2 id="returns">Returns</h2>
-<p>None. Prints MSE, RPS, Classification accuracy and confusion matrix.</p></div>
+<p>None. Prints MSE, RPS, Classification accuracy and confusion matrix.</p>
+<h2 id="notes">Notes</h2>
+<p><a href="#orf.OrderedForest.performance">.performance()`</a> evaluates the
+probability and class predictions in terms of Ranked Probability
+Score (RPS), Mean Squared Error (MSE) and Classification Accuracy (CA).
+In addition, it prints the confusion matrix.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load package
+import orf
+
+# get example data
+features, outcome  = orf.example_data(seed=123)
+
+# estimate Ordered Forest
+oforest = orf.OrderedForest().fit(X=features, y=outcome)
+
+# print the prediction performance measures
+oforest.performance()
+</code></pre></div>
 </dd>
 <dt id="orf.OrderedForest.plot"><code class="name flex">
 <span>def <span class="ident">plot</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Plot the probability distributions fitted by the OrderedForest</p>
+<div class="desc"><p>Plot the probability distributions estimated by the Ordered Forest
+object of class <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>.</p>
 <h2 id="parameters">Parameters</h2>
 <p>None.</p>
 <h2 id="returns">Returns</h2>
-<p>None.</p></div>
+<dl>
+<dt><strong><code>fig</code></strong> :&ensp;<code>object</code> of <code>type ggplot</code></dt>
+<dd>Plot of probability distributions.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p><a href="#orf.OrderedForest.plot"><code>.plot()</code></a> generates probability
+distributions, i.e. density plots of the estimated ordered
+probabilities by the Ordered Forest for each outcome
+class considered. The plots effectively visualize the estimated
+probability density in contrast to a real observed ordered outcome
+class and as such provide a visual inspection of the overall in-sample
+estimation accuracy. The dashed lines locate the means of the
+respective probability distributions.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load package
+import orf
+
+# get example data
+features, outcome  = orf.example_data(seed=123)
+
+# estimate Ordered Forest
+oforest = orf.OrderedForest().fit(X=features, y=outcome)
+
+# plot the estimated probability distributions
+oforest.plot()
+</code></pre></div>
 </dd>
 <dt id="orf.OrderedForest.predict"><code class="name flex">
 <span>def <span class="ident">predict</span></span>(<span>self, X=None, prob=True)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>OrderedForest prediction.</p>
+<div class="desc"><p>Prediction for new observations based on the estimated Ordered Forest
+of class <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code> or <code>NoneType</code></dt>
-<dd>Matrix of new covariates or None if covariates from
-fit function should be used. If new data provided it must have
-the same number of features as the X in the fit function.</dd>
+<dt><strong><code>X</code></strong> :&ensp;<code>array-like</code> of <code>shape (n_samples, n_features)</code> or <code>NoneType</code></dt>
+<dd>Matrix of new features/covariates or <code>None</code> if covariates from
+fit function should be used. If new data provided, it must have
+the same number of features as the <code>X</code> in the
+<a href="#orf.OrderedForest.fit"><code>.fit()</code></a> function.</dd>
 <dt><strong><code>prob</code></strong> :&ensp;<code>bool</code></dt>
-<dd>Should the ordered probabilities be predicted? If False, ordered
-classes will be predicted instead. Default is True.</dd>
+<dd>If True, ordered probabilities are predicted. Otherwise, ordered
+classes are predicted instead. Note that inference is only
+available for probability predictions. The default is True.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
 <dt><strong><code>result</code></strong> :&ensp;<code>dict</code></dt>
 <dd>Dictionary containing prediction results. Use
-result.get("predictions") to extract array of predictions and
-result.get("variances") to extract array of variances.</dd>
-</dl></div>
+<code>result.get("predictions")</code> to extract array of predictions
+and <code>result.get("variances")</code> to extract array of variances.
+Both of these arrays are of shape <code>(n_samples, nclass)</code>.</dd>
+</dl>
+<h2 id="notes">Notes</h2>
+<p><a href="#orf.OrderedForest.predict"><code>.predict()</code></a> estimates the conditional
+ordered choice probabilities, i.e. <code>P[Y=m|X=x]</code> for new data points
+(array-like matrix of features <code>X</code> containing new test observations)
+based on the estimated Ordered Forest object of class
+<code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>. Furthermore, weight-based inference for the
+probability predictions can be conducted as well, this is
+inherited from the <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code> class arguments. If inference is
+desired, the supplied Ordered Forest must be estimated with honesty and
+subsampling. If only prediction is desired, estimation without honesty
+and with bootstrapping is recommended for optimal predictive
+performance. In addition to the probability predictions, class
+predictions can be estimated as well setting <code>prob=False</code>. In this
+case, for each observation the class with the highest predicted
+probability is returned.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load packages
+import orf
+from sklearn.model_selection import train_test_split
+
+# get example data
+features, outcome  = orf.example_data(seed=123)
+
+# generate train and test set
+X_train, X_test, y_train, y_test = train_test_split(
+    features, outcome, test_size=0.2, random_state=123)
+
+# estimate Ordered Forest
+oforest = orf.OrderedForest().fit(X=X_train, y=y_train)
+
+# predict the probabilities with the estimated Ordered Forest
+pred = oforest.predict(X=X_test)
+# return predictions as array
+print(pred.get(&quot;predictions&quot;))
+
+# predict the classes with estimated Ordered Forest
+pred_class = oforest.predict(X=X_test, prob=False)
+# return predictions as array
+pred_class.get(&quot;predictions&quot;)
+
+# estimate Ordered Forest using inference
+oforest = orf.OrderedForest(inference=True).fit(X=X_train, y=y_train)
+
+# predict the probabilities together with variances
+pred_inf = oforest.predict(X=X_test)
+# return predictions as array
+print(pred_inf.get(&quot;predictions&quot;))
+# return variances as array
+print(pred_inf.get(&quot;variances&quot;))
+</code></pre></div>
 </dd>
 <dt id="orf.OrderedForest.summary"><code class="name flex">
 <span>def <span class="ident">summary</span></span>(<span>self, item=None)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Print forest information and prediction performance.</p>
+<div class="desc"><p>Summary of estimated Ordered Forest object of class <code><a title="orf.OrderedForest" href="#orf.OrderedForest">OrderedForest</a></code>.</p>
 <h2 id="parameters">Parameters</h2>
 <dl>
-<dt><strong><code>item</code></strong> :&ensp;<code>Nonetype</code> or <code>dict</code></dt>
+<dt><strong><code>item</code></strong> :&ensp;<code>dict</code> or <code>NoneType</code></dt>
 <dd>Object that should be summarized: Either prediction or margins
-output or None. If None then forest parameters will be printed.</dd>
+output or None. If None, then forest parameters will be printed.
+The default is None.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
-<p>None.</p></div>
+<p>None. Prints summary to console.</p>
+<h2 id="notes">Notes</h2>
+<p><a href="#orf.OrderedForest.summary"><code>.summary()</code></a> provides a short summary of
+the Ordered Forest estimation, including the input information
+regarding the values of hyperparameters as well as the output
+information regarding the prediction accuracy.</p>
+<h2 id="examples">Examples</h2>
+<pre><code class="language-py"># load package
+import orf
+
+# get example data
+features, outcome  = orf.example_data(seed=123)
+
+# estimate Ordered Forest
+oforest = orf.OrderedForest().fit(X=features, y=outcome)
+
+# print summary of estimation
+oforest.summary()
+
+# predict the probabilities with the estimated Ordered Forest
+pred = oforest.predict()
+
+# print summary of the Ordered Forest predictions
+oforest.summary(pred)
+
+# estimate marginal effects for first feature
+marg = oforest.margins(X_eval = [0])
+
+# print summary of the marginal effects
+oforest.summary(marg)
+</code></pre></div>
 </dd>
 </dl>
 </dd>
@@ -313,8 +704,11 @@ output or None. If None then forest parameters will be printed.</dd>
 <h1>Index</h1>
 <div class="toc">
 <ul>
-<li><a href="#welcome-to-the-orf-package">Welcome to the ORF package!</a></li>
-<li><a href="#what-objects-are-documented">What objects are documented?</a></li>
+<li><a href="#description">Description</a></li>
+<li><a href="#installation">Installation</a></li>
+<li><a href="#examples">Examples</a></li>
+<li><a href="#authors">Authors</a></li>
+<li><a href="#references">References</a></li>
 </ul>
 </div>
 <ul id="index">
