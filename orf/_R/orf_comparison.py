@@ -13,24 +13,37 @@ import numpy as np
 
 from plotnine import ggsave
 
-path="D:\switchdrive\Projects\ORF_Python\ORFpy"
+#path="D:\switchdrive\Projects\ORF_Python\ORFpy"
 #path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
+path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
 os.chdir(path)
 
 # load the ordered forest
+import orf
 from orf.OrderedForest import OrderedForest
 
 # %% read in data
 # read in synthetic test data based on the orf package in R
 odata = pd.read_csv('orf/_R/data/odata_test.csv')
+# read in synthetic test data based on the orf package in R, small version
+odata_small = pd.read_csv('orf/_R/data/odata_package.csv')
 # read in empirical test data based on the stevedata package in R
 dataset = pd.read_csv('orf/_R/data/empdata_test.csv')
+
+# %% generate data
+features, outcome = orf.example_data(seed=123)
+# put into dataframe
+odata_pip =  pd.DataFrame(np.concatenate(
+    [np.reshape(outcome, (-1,1)), features], axis=1)).rename(
+    columns={0: 'y', 1: 'x1', 2: 'x2', 3: 'x3', 4: 'x4'})
+# and save
+odata_pip.to_csv('orf/_R/data/odata_pip.csv', index=False)
 
 # %% benchmark settings
 replace_options = [False, True]
 honesty_options = [False, True]
 inference_options = [False, True]
-data_types = ['synth', 'emp']
+data_types = ['synth', 'emp', 'package', 'pip']
 
 # start benchmark
 for data_idx in data_types:
@@ -39,10 +52,18 @@ for data_idx in data_types:
         # specify response and covariates
         X = odata.drop('Y', axis=1)
         Y = odata['Y']
-    else:
+    elif data_idx == 'emp':
         # specify response and covariates
         X = dataset.drop('y', axis=1)
         Y = dataset['y']
+    elif data_idx == 'pip':
+        # specify response and covariates
+        X = odata_pip.drop('y', axis=1)
+        Y = odata_pip['y']
+    else:
+        # specify response and covariates
+        X = odata_small.drop('Y', axis=1)
+        Y = odata_small['Y']
 
     # loop through different settings and save results
     for inference_idx in inference_options:
@@ -65,7 +86,7 @@ for data_idx in data_types:
                       'replace:', replace_idx)
 
                 # fit ORF with at least 2000 trees (set seed for replicability)
-                orf_fit = OrderedForest(n_estimators=100, min_samples_leaf=5,
+                orf_fit = OrderedForest(n_estimators=2000, min_samples_leaf=5,
                                         max_features=0.3, random_state=123,
                                         replace=replace_idx,
                                         honesty=honesty_idx,

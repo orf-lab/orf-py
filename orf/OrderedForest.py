@@ -63,8 +63,9 @@ class OrderedForest(OrderedRandomForest):
         for growing the forest. The default is 0.5.
     inference : bool
         If True, weight-based inference (i.e. variance estimation and
-        uncertainty quantification of the estimates) is conducted. The
-        default is False.
+        uncertainty quantification of the estimates) is conducted. Note, that
+        this is a computationally intensive procedure and slows down the
+        program. The default is False.
     n_jobs : int or None
         The number of parallel jobs to be used for multithreading in 
         [`.fit()`](#orf.OrderedForest.fit), 
@@ -387,9 +388,9 @@ class OrderedForest(OrderedRandomForest):
             default.
         X_eval : list or tuple or NoneType
             List or tuple indicating the columns with covariates for which the,
-            marginal effect should be evaluated, i.e. `X_eval=(1,)` or 
-            `X_eval=[1]` if the effect for the covariate in the column should
-            be evaluated. This can significantly speed up the computations. 
+            marginal effect should be evaluated, i.e. `X_eval=(0,)` or 
+            `X_eval=[0]` if the effect for the covariate in the first column
+            should be evaluated. This can significantly speed up the program. 
             If not defined, all covariates are considered as default.
         eval_point: string
             Defining evaluation point for marginal effects. This can be one

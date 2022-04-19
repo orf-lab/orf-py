@@ -53,8 +53,8 @@ def example_data(n_samples=1000,
     of an ordered outcome variable with `y_classes` classes and an array of 
     features of different types. The data-generating process (DGP) may include
     continuous (`p_cont`), binary (`p_binary`) and categorical (`p_cat`)
-    features. In addition, it is possible to include random noise in the 
-    outcome variable by specifying `noise=True`. 
+    features. In addition, it is possible to include a noise variable in the
+    DGP that does not affect the outcome variable by specifying `noise=True`. 
     
     Example
     -------

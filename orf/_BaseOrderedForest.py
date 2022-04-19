@@ -65,7 +65,7 @@ class BaseOrderedForest(BaseEstimator):
         self.confusion = None
         self.measures = None
 
-    def _input_checks(self, n_features):
+    def _input_checks(self):
         # check and define the input parameters
         n_estimators = self.n_estimators
         min_samples_leaf = self.min_samples_leaf
@@ -77,6 +77,9 @@ class BaseOrderedForest(BaseEstimator):
         inference = self.inference
         n_jobs = self.n_jobs
         random_state = self.random_state
+
+        # define number of features
+        n_features = self.n_features
 
         # check the number of trees in the forest
         if isinstance(n_estimators, int):
@@ -161,8 +164,8 @@ class BaseOrderedForest(BaseEstimator):
 
         # check subsampling fraction
         if self.replace:
-            # if bootstrapping, set the subsampling share to 1
-            self.sample_fraction = 1
+            # if bootstrapping, set the subsampling share to take all obs
+            self.sample_fraction = None
         else:
             # else if subsampling is being used
             if isinstance(sample_fraction, float):
@@ -281,7 +284,7 @@ class BaseOrderedForest(BaseEstimator):
         # obtain total number of observations
         self.n_features = _num_features(X)
         # run input checks for arguments
-        self._input_checks(n_features=self.n_features)
+        self._input_checks()
         # Get vector of sorted unique values of y
         y_values = np.unique(y)
         # obtain total number of observations
@@ -292,14 +295,19 @@ class BaseOrderedForest(BaseEstimator):
         # Next, ensure that y is a vector of continuous integers starting at 
         # 1 up to nclass
         # Check if y consists of integers
-        if not all(isinstance(x, (np.integer)) for x in y_values):
+        if all(isinstance(x, (np.integer)) for x in y_values):
             # Recode y appropriately (keeps order but recodes values as 1,2...)
             y = np.searchsorted(np.unique(y), y)+1
         else:
-            # Check if contiguous sequence
-            if not ((min(y_values)==1) and (max(y_values)==nclass)):
+            # Check if continuous sequence
+            if ((min(y_values)==1) and (max(y_values)==nclass)):
                 # Recode y appropriately
-                y = np.searchsorted(np.unique(y), y)+1
+                y = (np.searchsorted(np.unique(y), y)+1).astype(int)
+                y_values = np.unique(y)
+            else:
+                # raise value error
+                raise ValueError("n_jobs must be of type integer"
+                                 ", got %s" % type(y_values[0]))
 
         # create an empty dictionary to save the forests
         forests = {}

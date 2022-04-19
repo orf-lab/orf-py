@@ -11,6 +11,8 @@ import os
 import pandas as pd
 import numpy as np
 
+from scipy import stats
+
 # path="D:\switchdrive\Projects\ORF_Python\ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 path = "/Users/okasag/Desktop/HSG/orf/python/ORFpy"
@@ -23,7 +25,7 @@ from orf.OrderedForest import OrderedForest
 replace_options = [False, True]
 honesty_options = [False, True]
 inference_options = [False, True]
-data_types = ['synth']#, 'emp']
+data_types = ['synth', 'emp', 'package', 'pip']
 # saved results
 saved_results = ['orf_pred', 'orf_var', 'orf_rps', 'orf_mse',
                  'margins_effects', 'margins_vars']
@@ -111,11 +113,11 @@ for data_idx in data_types:
     r_vars = r_results_all[var_name]
     py_vars = py_results_all[var_name]
     # get upper confidence intervals
-    r_ci_up = r_effects + 1.96 * np.sqrt(r_vars)
-    py_ci_up = py_effects + 1.96 * np.sqrt(py_vars)
+    r_ci_up = r_effects + np.abs(stats.norm.ppf(.975)) * np.sqrt(r_vars)
+    py_ci_up = py_effects + np.abs(stats.norm.ppf(.975)) * np.sqrt(py_vars)
     # get lower confidence intervals
-    r_ci_down = r_effects - 1.96 * np.sqrt(r_vars)
-    py_ci_down = py_effects - 1.96 * np.sqrt(py_vars)
+    r_ci_down = r_effects - np.abs(stats.norm.ppf(.975)) * np.sqrt(r_vars)
+    py_ci_down = py_effects - np.abs(stats.norm.ppf(.975)) * np.sqrt(py_vars)
     # check if results are inbetween
     # R
     if np.all((r_effects <= py_ci_up) & (r_effects >= py_ci_down)):

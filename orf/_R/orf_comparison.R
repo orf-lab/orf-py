@@ -61,9 +61,21 @@ cuts <- quantile(Y, c(0, 1/3, 2/3, 1))
 Y <- as.numeric(cut(Y, breaks = cuts, include.lowest = TRUE))
 
 # save data as a dataframe
-odata <- as.data.frame(cbind(Y, X))
+odata_synth <- as.data.frame(cbind(Y, X))
 # save data to disk
-write.csv(odata, file = paste0(path, '/data/odata_test.csv'), row.names = F)
+write.csv(odata_synth, file = paste0(path, '/data/odata_test.csv'), row.names = F)
+
+# ---------------------------------------------------------------------------- #
+
+# Synthetic Data directly from orf R package
+data(odata)
+# save data to disk
+write.csv(odata, file = paste0(path, '/data/odata_package.csv'), row.names = F)
+
+# ---------------------------------------------------------------------------- #
+
+# Synthetic Data directly from orf PyPi package
+odata_pip <- as.data.frame(read_csv(file = paste0(path, '/data/odata_pip.csv')))
 
 # ---------------------------------------------------------------------------- #
 
@@ -71,19 +83,27 @@ write.csv(odata, file = paste0(path, '/data/odata_test.csv'), row.names = F)
 replace_options <- list(FALSE, TRUE)
 honesty_options <- list(FALSE, TRUE)
 inference_options <- list(FALSE, TRUE)
-data_types <- list('synth', 'emp')
+data_types <- list('synth', 'emp', 'pip', 'package')
 
 # start benchmarks
 for (data_idx in data_types) {
   # based on data type, determine X and Y
   if (data_idx == 'synth') {
     # specify response and covariates
-    Y <- as.numeric(odata[, 1])
-    X <- as.matrix(odata[, -1])
-  } else {
+    Y <- as.numeric(odata_synth[, 1])
+    X <- as.matrix(odata_synth[, -1])
+  } else if (data_idx == 'emp') {
     # specify response and covariates
     X <- as.matrix(dataset[, 1:ncol(dataset)-1])
     Y <- as.numeric(dataset[, ncol(dataset)])
+  } else if (data_idx == 'pip') {
+    # specify response and covariates
+    Y <- as.numeric(odata_pip[, 1])
+    X <- as.matrix(odata_pip[, -1])
+  } else {
+    # specify response and covariates
+    Y <- as.numeric(odata[, 1])
+    X <- as.matrix(odata[, -1])
   }
   
   # loop through different settings and save the results
