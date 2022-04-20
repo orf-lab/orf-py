@@ -276,8 +276,11 @@ class BaseOrderedForest(BaseEstimator):
         """
         OrderedForest estimation.
         """
-
-        # %% Use sklearn input checks to allow for multiple types of inputs:
+        # Check if input is pandas data frame. If yes, save feature names
+        self.feature_names=None
+        if isinstance(X, pd.DataFrame):
+            self.feature_names=X.columns.values
+        # Use sklearn input checks to allow for multiple types of inputs:
         # - returns numpy arrays for X and y (no matter which input type)
         # - forces y to be numeric
         X,y = check_X_y(X, y, y_numeric=True, estimator="OrderedForest")
@@ -298,6 +301,7 @@ class BaseOrderedForest(BaseEstimator):
         if all(isinstance(x, (np.integer)) for x in y_values):
             # Recode y appropriately (keeps order but recodes values as 1,2...)
             y = np.searchsorted(np.unique(y), y)+1
+            y_values = np.unique(y)
         else:
             # Check if continuous sequence
             if ((min(y_values)==1) and (max(y_values)==nclass)):

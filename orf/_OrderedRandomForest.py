@@ -735,6 +735,7 @@ class OrderedRandomForest(BaseOrderedForest):
         # put everything into a dict of results
         results = {'output': 'margin',
                    'eval_point': eval_point,
+                   'X_eval': X_eval_ind,
                    'window': window,
                    'effects': margins,
                    'variances': variance_me,
@@ -747,7 +748,11 @@ class OrderedRandomForest(BaseOrderedForest):
         # check if marginal effects should be printed
         if verbose:
             string_seq_X = [str(x) for x in X_eval_ind]
+            index_X = ['X' + sub for sub in string_seq_X]
+            if self.feature_names is not None:
+                index_X = self.feature_names[X_eval_ind]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
+            columns_X = ['Cat' + sub for sub in string_seq_cat]
 
             # print marginal effects nicely
             if not self.inference:
@@ -755,20 +760,20 @@ class OrderedRandomForest(BaseOrderedForest):
                       'Marginal Effects of OrderedForest, evaluation point: '+ 
                       eval_point, '-' * 70, 'Effects:', '-' * 70,
                       pd.DataFrame(data=margins, 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 70, sep='\n')
             else:
                 print('-' * 70,
                       'Marginal Effects of OrderedForest, evaluation point: '+ 
                       eval_point, '-' * 70, 'Effects:', '-' * 70,
                       pd.DataFrame(data=margins, 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 70,'Standard errors:', '-' * 70,
                       pd.DataFrame(data=sd_me, 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 70, sep='\n')
 
         return results
@@ -949,7 +954,11 @@ class OrderedRandomForest(BaseOrderedForest):
         elif item['output']=='margin':
             string_seq_X = [str(x) for x in np.arange(1,np.shape(
                 item['effects'])[0]+1)]
+            index_X = ['X' + sub for sub in string_seq_X]
+            if self.feature_names is not None:
+                index_X = self.feature_names[item['X_eval']]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
+            columns_X = ['Cat' + sub for sub in string_seq_cat]
             print('-' * 60, 
                   'Summary of the OrderedForest marginal effects',
                   '-' * 60, sep='\n')
@@ -970,38 +979,38 @@ class OrderedRandomForest(BaseOrderedForest):
             print('%-18s%-15s' % ('inference:', self.inference))
             print('-' * 60,'Marginal effects:', 
                   pd.DataFrame(data=item['effects'], 
-                               index=['X' + sub for sub in string_seq_X], 
+                               index=index_X, 
                                columns=['Cat' + sub for sub in string_seq_cat]),
                   '-' * 60, sep='\n')
             if item['std_errors'] is not None:
                 print('Standard errors:', 
                       pd.DataFrame(data=item['std_errors'], 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 60, sep='\n')
             if item['t-values'] is not None:
                 print('t-values:', 
                       pd.DataFrame(data=item['t-values'], 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 60, sep='\n')
             if item['p-values'] is not None:
                 print('p-values:', 
                       pd.DataFrame(data=item['p-values'], 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 60, sep='\n')
             if item['ci-up'] is not None:
                 print('ci-up:', 
                       pd.DataFrame(data=item['ci-up'], 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 60, sep='\n')
             if item['ci-down'] is not None:
                 print('ci-down:', 
                       pd.DataFrame(data=item['ci-down'], 
-                                   index=['X' + sub for sub in string_seq_X], 
-                                   columns=['Cat' + sub for sub in string_seq_cat]),
+                                   index=index_X, 
+                                   columns=columns_X),
                       '-' * 60, sep='\n')
 
         # empty return

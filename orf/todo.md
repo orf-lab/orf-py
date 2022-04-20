@@ -5,11 +5,6 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 ## To Do:
 
 - run code analysis and adjust accordingly (G)
-- revert the order of functions and classes in the html documentation (F)
-- check that examples run and add unit test file (F)
-- title: orf: ordered random forests (F)
-- variable names for margin print inherit from pandas dataframe, otherwise X0, X1, X2, ...(F)
-
 - 'codeY typo in R package description of the orf function (G)
 - check how to handle categorical variables in R (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)
 - implement while loop in R for marginal effects if window too small to yield different x_up and x_down (G)
@@ -19,6 +14,10 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Done:
 
+- revert the order of functions and classes in the html documentation (F)
+- title: orf: ordered random forests (F)
+- variable names for margin print inherit from pandas dataframe, otherwise X0, X1, X2, ...(F)
+- check that examples run and add unit test file (F)
 - bug fix in handling integer outcomes and scikit learn max_samples argument (G)
 - API reference in Python (F)
 - add examples to docstrings and check attributes vs. returns, and check argument descriptions (F)

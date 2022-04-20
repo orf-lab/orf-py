@@ -168,7 +168,7 @@ class OrderedForest(OrderedRandomForest):
     oforest = orf.OrderedForest(n_estimators = 2000, min_samples_leaf = 10,
                                 max_features = 3, replace = True,
                                 sample_fraction = 1, honesty = False,
-                                honesty.fraction = 0, inference = False)    
+                                honesty_fraction = 0, inference = False)    
     ```
     """
 
@@ -275,7 +275,7 @@ class OrderedForest(OrderedRandomForest):
                                     min_samples_leaf = 10,
                                     max_features = 3, replace = True,
                                     sample_fraction = 1, honesty = False,
-                                    honesty.fraction = 0,
+                                    honesty_fraction = 0,
                                     inference = False)    
         # estimate Ordered Forest
         oforest.fit(X=features, y=outcome)
