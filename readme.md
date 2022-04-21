@@ -1,5 +1,5 @@
 # orf: ordered random forests <a href='https://github.com/orf-lab'><img
-src='https://raw.githubusercontent.com/fmuny/ORFpy/master/images/logo/orf-logo.png'
+src='https://github.com/fmuny/ORFpy/blob/main/images/orf-logo.png'
 align="right" height="120" /></a>
 
 Welcome to the repository of the `Python` package `orf` for random forest estimation
