@@ -1,68 +1,83 @@
-# orf: ordered random forests
+# orf: ordered random forests <a href='https://github.com/orf-lab'><img
+src='https://raw.githubusercontent.com/fmuny/ORFpy/master/images/logo/orf-logo.png'
+align="right" height="120" /></a>
 
-Welcome to the repository of the Python implementation for the Ordered Forest estimator
-([Lechner & Okasa, 2019](https://arxiv.org/abs/1907.02436)) for machine learning estimation
-of the ordered choice models. The current Python implementation is focused on the prediction
-exercise and does not yet provide the procedures for statistical inference. For the full
-functionality please refer to the `R` package `orf` available on [CRAN](https://CRAN.R-project.org/package=orf)
-repository.
+Welcome to the repository of the `Python` package `orf` for random forest estimation
+of the ordered choice models. For the `R` version of the `orf` package 
+[Lechner and Okasa (2020)](https://cran.r-project.org/web/packages/orf/orf.pdf)
+please refer to the [CRAN](https://CRAN.R-project.org/package=orf) repository.
 
 ## Introduction
 
-This repository provides the Python implementation of the Ordered Forest estimator
+The `Python` package `orf` is an implementation of the Ordered Forest estimator
 as developed in [Lechner and Okasa (2019)](https://arxiv.org/abs/1907.02436).
 The Ordered Forest flexibly estimates the conditional probabilities of models with
 ordered categorical outcomes (so-called ordered choice models). Additionally to
 common machine learning algorithms the Ordered Forest provides functions for estimating
 marginal effects and thus provides similar output as in standard econometric models
-for ordered choice. The core Ordered Forest algorithm relies on the random forest
-implementation from the `scikit-learn` module ([Pedregosa et al., 2011](https://jmlr.csail.mit.edu/papers/v12/pedregosa11a.html)).
-The here provided functions for estimating the Ordered Forest also use the `scikit-learn`
-typical command syntax and should thus be easy to use.
+for ordered choice. The core Ordered Forest algorithm relies on the fast forest
+implementations from the `scikit-learn` ([Pedregosa et al., 2011](https://jmlr.csail.mit.edu/papers/v12/pedregosa11a.html)) and 
+`EconML` ([Battocchi et al., 2019](https://econml.azurewebsites.net/))
+libraries.
 
 ## Installation
 
-The implementation of the Ordered Forest relies on Python 3 and requires `scikit-learn`
-as well as `numpy` and `pandas`. The required modules can be installed by navigating to the root
-of this project and executing the following command: `pip install -r dependencies.txt`.
+In order to install the latest `PyPi` released version run:
+```
+pip install orf
+```
+in the terminal.
+
+The implementation relies on Python 3 and is compatible with version 3.8, 3.9 and 3.10.
 
 ## Examples
 
 The example below demonstrates the basic functionality of the Ordered Forest.
 
 ```python
-# load the Ordered Forest
-from orf.orf import OrderedForest
+## Ordered Forest
+import orf
 
-# import additonal modules
-import pandas as pd
+# load example data
+features, outcome = orf.example_data()
 
-# read in example data from the orf package in R
-odata = pd.read_csv('orf/odata.csv')
+# initiate Ordered Forest with custom settings
+oforest = orf.OrderedForest(n_estimators=1000, min_samples_leaf=5,
+                            max_features=2, replace=False, sample_fraction=0.5,
+                            honesty=True, honesty_fraction=0.5, inference=False,
+                            n_jobs=-1, random_state=123)
 
-# define outcome and features
-outcome = odata['Y']
-features = odata.drop('Y', axis=1)
-
-# Ordered Forest estimation
-
-# initiate the class with tuning parameters
-oforest = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3)
-# fit the model
+# fit Ordered Forest
 oforest.fit(X=features, y=outcome)
-# predict ordered probabilities
-oforest.predict(X=features)
+
+# show summary of the Ordered Forest estimation
+oforest.summary()
+
 # evaluate the prediction performance
 oforest.performance()
-# evaluate marginal effects
-oforest.margin(X=features)
+
+# plot the estimated probability distributions
+oforest.plot()
+
+# predict ordered probabilities in-sample
+oforest.predict(X=None, prob=True)
+
+# evaluate marginal effects for the Ordered Forest
+oforest.margins(X=None, X_cat=None, X_eval=None, eval_point='mean', window=0.1)
 ```
 
-The complete example code as well as the example data are available in the `orf` folder.
+For more detailed examples see the package description.
 
 ## References
 
-- Lechner, M., & Okasa, G. (2019). Random Forest Estimation of the Ordered Choice Model. arXiv preprint arXiv:1907.02436. <https://arxiv.org/abs/1907.02436>
-- Pedregosa et al. (2011). Scikit-learn: Machine Learning in Python. JMLR 12, pp. 2825-2830. <https://jmlr.csail.mit.edu/papers/v12/pedregosa11a.html>
+- Battocchi, K., Dillon, E., Hei, M., Lewis, G., Oka, P., Oprescu, M. & 
+  Syrgkanis, V. (2019). EconML: A Python Package for ML-Based Heterogeneous 
+ Treatment Effects Estimation. Version 0.13.0, <https://github.com/microsoft/EconML>
+- Lechner, M., & Okasa, G. (2019). Random Forest Estimation of the Ordered Choice Model.
+  arXiv preprint arXiv:1907.02436. <https://arxiv.org/abs/1907.02436>
+- Lechner, M., & Okasa, G. (2020). orf: Ordered Random Forests.
+  R package version 0.1.3, <https://CRAN.R-project.org/package=orf>
+- Pedregosa et al. (2011). Scikit-learn: Machine Learning in Python. JMLR 12, pp. 2825-2830.
+  <https://jmlr.csail.mit.edu/papers/v12/pedregosa11a.html>
 
-Special thanks goes to [JLDC](https://github.com/JLDC).
+The `orf` logo has been created via R-package [hexSticker](https://CRAN.R-project.org/package=hexSticker) using [Tourney](https://fonts.google.com/specimen/Tourney?query=Tyler+Finck&preview.text=orf&preview.text_type=custom) font designed by Tyler Finck, ETC.
