@@ -11,6 +11,7 @@ Definition of post-fitting methods.
 # import modules
 import numpy as np
 import pandas as pd
+
 from orf._BaseOrderedForest import BaseOrderedForest
 from sklearn.utils import check_array
 from sklearn.utils.validation import _num_samples, check_is_fitted

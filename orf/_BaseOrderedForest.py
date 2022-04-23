@@ -9,7 +9,6 @@ Definition of base ordered forest estimator and fit function.
 """
 
 # import modules
-import ray
 import sharedmem
 
 import numpy as np
@@ -23,9 +22,7 @@ from sklearn.utils import check_random_state, check_X_y
 from sklearn.utils.validation import _num_samples, _num_features
 from econml.grf import RegressionForest
 from joblib import Parallel, delayed, parallel_backend
-from multiprocessing import Pool, cpu_count, Lock
-from mpire import WorkerPool
-from functools import partial
+from multiprocessing import cpu_count, Lock
 
 
 # %% Class definition
