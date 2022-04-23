@@ -13,7 +13,7 @@ from econml.grf import CausalForest
 
 # %% Empirical Dataset
 # read in empirical test data based on the stevedata package in R
-dataset = pd.read_csv('orf/_R/data/empdata_test.csv')
+dataset = pd.read_csv('dev/_R/data/empdata_test.csv')
 Y = np.array(dataset.y)
 T = np.array(dataset.HealthInsurance)
 X = np.array(dataset.drop(['HealthInsurance', 'y'], axis=1))

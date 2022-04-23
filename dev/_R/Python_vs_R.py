@@ -60,12 +60,12 @@ for result_idx in saved_results:
                                    str(honesty_idx).upper() + '_R_' +
                                    str(replace_idx).upper())
                     # load data from R
-                    r_result = np.array(pd.read_csv((path + '/orf/_R/results/R_'
+                    r_result = np.array(pd.read_csv((path + '/dev/_R/results/R_'
                                             + result_name + '.csv'), header=0))
                     # save the result into a dictionary
                     r_results_all[result_name] = r_result
                     # load data from Python
-                    py_result = np.array(pd.read_csv((path + '/orf/_R/results/py_'
+                    py_result = np.array(pd.read_csv((path + '/dev/_R/results/py_'
                                              + result_name + '.csv'), header=None))
                     # save the result into a dictionary
                     py_results_all[result_name] = py_result
@@ -95,9 +95,9 @@ for result_idx in saved_results:
                     diffs[result_name] = result_diff
 
 # save the differences and the results themselves separately on disk
-np.save(path + '/orf/_R/results/' + 'diffs.npy', diffs)
-np.save(path + '/orf/_R/results/' + 'r_results_all.npy', r_results_all)
-np.save(path + '/orf/_R/results/' + 'py_results_all.npy', py_results_all)
+np.save(path + '/dev/_R/results/' + 'diffs.npy', diffs)
+np.save(path + '/dev/_R/results/' + 'r_results_all.npy', r_results_all)
+np.save(path + '/dev/_R/results/' + 'py_results_all.npy', py_results_all)
 
 # %% compare if marginal effects lie within the confidence intervals
 # of the other implementation

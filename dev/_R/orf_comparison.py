@@ -24,20 +24,20 @@ from orf.OrderedForest import OrderedForest
 
 # %% read in data
 # read in synthetic test data based on the orf package in R
-odata = pd.read_csv('orf/_R/data/odata_test.csv')
+odata = pd.read_csv('dev/_R/data/odata_test.csv')
 # read in synthetic test data based on the orf package in R, small version
-odata_small = pd.read_csv('orf/_R/data/odata_package.csv')
+odata_small = pd.read_csv('dev/_R/data/odata_package.csv')
 # read in empirical test data based on the stevedata package in R
-dataset = pd.read_csv('orf/_R/data/empdata_test.csv')
+dataset = pd.read_csv('dev/_R/data/empdata_test.csv')
 
 # %% generate data
-features, outcome = orf.example_data(seed=123)
+features, outcome = orf.make_ordered_regression(seed=123)
 # put into dataframe
 odata_pip =  pd.DataFrame(np.concatenate(
     [np.reshape(outcome, (-1,1)), features], axis=1)).rename(
     columns={0: 'y', 1: 'x1', 2: 'x2', 3: 'x3', 4: 'x4'})
 # and save
-odata_pip.to_csv('orf/_R/data/odata_pip.csv', index=False)
+odata_pip.to_csv('dev/_R/data/odata_pip.csv', index=False)
 
 # %% benchmark settings
 replace_options = [False, True]
@@ -122,7 +122,7 @@ for data_idx in data_types:
                                  str(inference_idx).upper() + '_H_' +
                                  str(honesty_idx).upper() + '_R_' +
                                  str(replace_idx).upper() + '.png'),
-                       path=path + '/orf/_R/results/')
+                       path=path + '/dev/_R/results/')
 
                 # save the results for fit
                 for key, value in fit_results.items():
@@ -132,7 +132,7 @@ for data_idx in data_types:
                     if value is None:
                         value = [0]
                     # save the results
-                    np.savetxt(fname=(path + '/orf/_R/results/py_' + data_idx
+                    np.savetxt(fname=(path + '/dev/_R/results/py_' + data_idx
                                       + '_' + str(key) + '_I_' +
                                       str(inference_idx).upper() + '_H_' +
                                       str(honesty_idx).upper() + '_R_' +
@@ -147,7 +147,7 @@ for data_idx in data_types:
                     if value is None:
                         value = [0]
                     # save the results
-                    np.savetxt(fname=(path + '/orf/_R/results/py_' + data_idx
+                    np.savetxt(fname=(path + '/dev/_R/results/py_' + data_idx
                                       + '_' + str(key) + '_I_' +
                                       str(inference_idx).upper() + '_H_' +
                                       str(honesty_idx).upper() + '_R_' +

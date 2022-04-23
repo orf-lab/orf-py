@@ -9,8 +9,9 @@
 .DS_Store
 
 # cache files
+/orf/__pycache__/*
 *.pyc
 
 # data from testing, but keep the folder
-/orf/_R/results/*
-!/orf/_R/results/.gitkeep 
+/dev/_R/results/*
+!/dev/_R/results/.gitkeep 

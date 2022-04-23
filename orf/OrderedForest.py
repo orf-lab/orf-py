@@ -232,7 +232,7 @@ class OrderedForest(OrderedRandomForest):
         import orf
         
         # get example data
-        features, outcome  = orf.example_data(seed=123)
+        features, outcome  = orf.make_ordered_regression(seed=123)
        
         # initialize Ordered Forest with default parameters
         oforest = orf.OrderedForest()
@@ -334,7 +334,7 @@ class OrderedForest(OrderedRandomForest):
         from sklearn.model_selection import train_test_split
         
         # get example data
-        features, outcome  = orf.example_data(seed=123)
+        features, outcome  = orf.make_ordered_regression(seed=123)
         
         # generate train and test set
         X_train, X_test, y_train, y_test = train_test_split(
@@ -442,7 +442,7 @@ class OrderedForest(OrderedRandomForest):
         import orf
         
         # get example data
-        features, outcome  = orf.example_data(seed=123)
+        features, outcome  = orf.make_ordered_regression(seed=123)
         
         # estimate Ordered Forest
         oforest = orf.OrderedForest().fit(X=features, y=outcome)
@@ -520,7 +520,7 @@ class OrderedForest(OrderedRandomForest):
         import orf
         
         # get example data
-        features, outcome  = orf.example_data(seed=123)
+        features, outcome  = orf.make_ordered_regression(seed=123)
         
         # estimate Ordered Forest
         oforest = orf.OrderedForest().fit(X=features, y=outcome)
@@ -577,7 +577,7 @@ class OrderedForest(OrderedRandomForest):
         import orf
         
         # get example data
-        features, outcome  = orf.example_data(seed=123)
+        features, outcome  = orf.make_ordered_regression(seed=123)
         
         # estimate Ordered Forest
         oforest = orf.OrderedForest().fit(X=features, y=outcome)
@@ -616,7 +616,7 @@ class OrderedForest(OrderedRandomForest):
         import orf
         
         # get example data
-        features, outcome  = orf.example_data(seed=123)
+        features, outcome  = orf.make_ordered_regression(seed=123)
         
         # estimate Ordered Forest
         oforest = orf.OrderedForest().fit(X=features, y=outcome)

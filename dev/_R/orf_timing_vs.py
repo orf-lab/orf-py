@@ -20,7 +20,7 @@ from orf.OrderedForest import OrderedForest
 
 # %% read in data
 # read in synthetic test data based on the orf package in R
-odata = pd.read_csv('orf/_R/data/odata_test.csv')
+odata = pd.read_csv('dev/_R/data/odata_test.csv')
 # specify response and covariates
 X_all = odata.drop('Y', axis=1)
 Y_all = odata['Y']
@@ -87,7 +87,7 @@ for n in n_options:
                                             'time':[np.mean(time_orf)]})    
                     results = pd.concat([results, result_it])
 
-results.to_csv(path + '/orf/_R/results/py_timing.csv', index=False) 
+results.to_csv(path + '/dev/_R/results/py_timing.csv', index=False) 
 
 
 """

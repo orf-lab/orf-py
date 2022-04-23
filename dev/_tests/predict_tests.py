@@ -10,7 +10,7 @@ os.chdir(path)
 from orf.orf import OrderedForest
 
 # read in example data from the orf package in R
-odata = pd.read_csv('orf/odata.csv')
+odata = pd.read_csv('dev/_data/odata.csv')
 
 # define outcome and features
 outcome = odata['Y']

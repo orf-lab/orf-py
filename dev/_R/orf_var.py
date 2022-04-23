@@ -11,7 +11,7 @@ import os
 import numpy as np
 
 # set path
-path = "/home/okasag/Documents/HSG/ORF/python/ORFpy/orf/R"
+path = "/home/okasag/Documents/HSG/ORF/python/ORFpy/dev/_R"
 os.chdir(path)
 
 # Hard-coded data to test variance computation in R vs. python

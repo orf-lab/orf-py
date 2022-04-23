@@ -16,36 +16,36 @@ os.chdir(path)
 
 # load from R package
 # weights
-weights_R_1 = pd.read_csv('orf/R/weights_R_1.csv')
-weights_R_2 = pd.read_csv('orf/R/weights_R_2.csv')
+weights_R_1 = pd.read_csv('dev/_R/weights_R_1.csv')
+weights_R_2 = pd.read_csv('dev/_R/weights_R_2.csv')
 # predictions
-pred_R_1 = pd.read_csv('orf/R/pred_R_1.csv')
-pred_R_2 = pd.read_csv('orf/R/pred_R_2.csv')
+pred_R_1 = pd.read_csv('dev/_R/pred_R_1.csv')
+pred_R_2 = pd.read_csv('dev/_R/pred_R_2.csv')
 # train data
-data_ind_train_R_1 = pd.read_csv('orf/R/data_in_train_R_1.csv')
-data_ind_train_R_2 = pd.read_csv('orf/R/data_in_train_R_2.csv')
+data_ind_train_R_1 = pd.read_csv('dev/_R/data_in_train_R_1.csv')
+data_ind_train_R_2 = pd.read_csv('dev/_R/data_in_train_R_2.csv')
 # honest data
-data_ind_honest_R_1 = pd.read_csv('orf/R/data_in_honest_R_1.csv')
-data_ind_honest_R_2 = pd.read_csv('orf/R/data_in_honest_R_2.csv')
+data_ind_honest_R_1 = pd.read_csv('dev/_R/data_in_honest_R_1.csv')
+data_ind_honest_R_2 = pd.read_csv('dev/_R/data_in_honest_R_2.csv')
 # indices (-1 to comply with Python)
-ind_est = pd.read_csv('orf/R/ind_est_R.csv') - 1
-ind_tr = pd.read_csv('orf/R/ind_tr_R.csv') - 1
+ind_est = pd.read_csv('dev/_R/ind_est_R.csv') - 1
+ind_tr = pd.read_csv('dev/_R/ind_tr_R.csv') - 1
 # variance
-variance_R = pd.read_csv('orf/R/variance_R.csv')
+variance_R = pd.read_csv('dev/_R/variance_R.csv')
 
 # load from Python package
 # weights
-weights_python_1 = pd.read_csv('orf/R/weights_python_1.csv')
-weights_python_2 = pd.read_csv('orf/R/weights_python_2.csv')
+weights_python_1 = pd.read_csv('dev/_R/weights_python_1.csv')
+weights_python_2 = pd.read_csv('dev/_R/weights_python_2.csv')
 # predictions
-pred_python_1 = pd.read_csv('orf/R/pred_python_1.csv')
-pred_python_2 = pd.read_csv('orf/R/pred_python_2.csv')
+pred_python_1 = pd.read_csv('dev/_R/pred_python_1.csv')
+pred_python_2 = pd.read_csv('dev/_R/pred_python_2.csv')
 # honest data
-data_ind_train_python_1 = pd.read_csv('orf/R/data_in_train_python_1.csv')
-data_ind_train_python_2 = pd.read_csv('orf/R/data_in_train_python_2.csv')
+data_ind_train_python_1 = pd.read_csv('dev/_R/data_in_train_python_1.csv')
+data_ind_train_python_2 = pd.read_csv('dev/_R/data_in_train_python_2.csv')
 # honest data
-data_ind_honest_python_1 = pd.read_csv('orf/R/data_in_honest_python_1.csv')
-data_ind_honest_python_2 = pd.read_csv('orf/R/data_in_honest_python_2.csv')
+data_ind_honest_python_1 = pd.read_csv('dev/_R/data_in_honest_python_1.csv')
+data_ind_honest_python_2 = pd.read_csv('dev/_R/data_in_honest_python_2.csv')
 
 # check if predictions correspond to weights * outcomes
 # R
@@ -273,28 +273,3 @@ else:
     print('Variances from R and Python are NOT the same!')
 
 # comparison of weights computation
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -3,7 +3,7 @@
 ################################################################################
 
 # set the directory to the one of the source file (requires Rstudio)
-path <- ("D:/switchdrive/Projects/ORF_Python/ORFpy/orf/_R")
+path <- ("D:/switchdrive/Projects/ORF_Python/ORFpy/dev/_R")
 
 # load packages
 library(tidyverse)

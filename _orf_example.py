@@ -8,14 +8,14 @@ Showcase application of the Ordered Forest estimator.
 
 # import modules
 import os
-import orf
 # path="D:\switchdrive\Projects\ORF_Python\ORFpy"
 # path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
 path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
 os.chdir(path)
+import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # Ordered Forest estimation
 

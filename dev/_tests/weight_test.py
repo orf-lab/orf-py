@@ -97,7 +97,7 @@ def _forest_weights_shared(tree, forest_apply, forest_apply_all, n_samples,
 
 
 # %% load the testing data for weight computation
-spydata = '/Users/okasag/Desktop/HSG/orf/python/ORFpy/orf/weight_test_data.spydata'
+spydata = '/Users/okasag/Desktop/HSG/orf/python/ORFpy/dev/_tests/weight_test_data.spydata'
 weight_test_data = load_dictionary(spydata)[0]
 # unpack the data to global environment
 for key in weight_test_data:

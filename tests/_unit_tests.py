@@ -1,9 +1,9 @@
 """
 orf: Ordered Random Forest.
 
-Python implementation of the Ordered Random Forest as in Lechner & Okasa (2019).
+Python implementation of the Ordered Forest as in Lechner & Okasa (2019).
 
-Overview of examples from documentation
+Overview and Testing of examples from documentation.
 
 """
 
@@ -14,7 +14,7 @@ Basic example using default settings
 import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # estimate Ordered Forest with default settings
 oforest = orf.OrderedForest()
@@ -36,15 +36,15 @@ oforest.predict()
 oforest.margins()
 
 """
-example_data()
+make_ordered_regression()
 """
 # load orf package
 import orf
 
 # generate dataset consisting of 2000 observations and 4 outcome classes
-features, outcome  = orf.example_data(n_samples=2000,
-                                      y_classes=4,
-                                      seed=123)
+features, outcome  = orf.make_ordered_regression(n_samples=2000,
+                                                 y_classes=4,
+                                                 seed=123)
 
 """
 OrderedForest()
@@ -88,7 +88,7 @@ fit()
 import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # initialize Ordered Forest with default parameters
 oforest = orf.OrderedForest()
@@ -143,7 +143,7 @@ margins()
 import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # estimate Ordered Forest
 oforest = orf.OrderedForest().fit(X=features, y=outcome)
@@ -193,7 +193,7 @@ performance()
 import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # estimate Ordered Forest
 oforest = orf.OrderedForest().fit(X=features, y=outcome)
@@ -208,7 +208,7 @@ plot()
 import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # estimate Ordered Forest
 oforest = orf.OrderedForest().fit(X=features, y=outcome)
@@ -224,7 +224,7 @@ import orf
 from sklearn.model_selection import train_test_split
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # generate train and test set
 X_train, X_test, y_train, y_test = train_test_split(
@@ -260,7 +260,7 @@ summary()
 import orf
 
 # get example data
-features, outcome  = orf.example_data(seed=123)
+features, outcome  = orf.make_ordered_regression(seed=123)
 
 # estimate Ordered Forest
 oforest = orf.OrderedForest().fit(X=features, y=outcome)
