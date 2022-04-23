@@ -9,7 +9,7 @@
 .DS_Store
 
 # cache files
-/orf/__pycache__/*
+/orf/__pycache__/
 *.pyc
 
 # data from testing, but keep the folder
