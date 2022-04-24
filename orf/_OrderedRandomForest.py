@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 orf: Ordered Random Forest.
 
@@ -66,7 +65,7 @@ class OrderedRandomForest(BaseOrderedForest):
         # Input checks
         # check if input has been fitted (sklearn function)
         check_is_fitted(self, attributes=["forest_"])
-        
+
         # Check if X defined properly (sklearn function)
         if not X is None:
             X = check_array(X)
@@ -83,7 +82,7 @@ class OrderedRandomForest(BaseOrderedForest):
                 X = None
         else:
             n_samples = _num_samples(self.forest_['X_fit'])
-        
+
         # check whether to predict probabilities or classes
         if isinstance(prob, bool):
             # assign the input value
@@ -92,7 +91,7 @@ class OrderedRandomForest(BaseOrderedForest):
             # raise value error
             raise ValueError("prob must be of type boolean"
                              ", got %s" % prob)
-        
+
         # get the forest inputs
         outcome_binary_est = self.forest_['outcome_binary_est']
         probs = self.forest_['probs']
@@ -101,21 +100,21 @@ class OrderedRandomForest(BaseOrderedForest):
         nclass = self.n_class
         # get inference argument
         inference = self.inference
-        
+
         # Check if prob allows to do inference
         if ((not prob) and (inference) and (X is not None)):
-            print('-' * 70, 
-                  'WARNING: Inference is not possible if prob=False.' 
+            print('-' * 70,
+                  'WARNING: Inference is not possible if prob=False.'
                   '\nClass predictions for large samples might be obtained'
                   '\nfaster when re-estimating OrderedForest with option'
-                  '\ninference=False.', 
+                  '\ninference=False.',
                   '-' * 70, sep='\n')
 
         # Initialize final variance output
         var_final = None
         # Initialize storage dictionary for weights
         weights = {}
-        
+
         # Get fitted values if X = None
         if X is None:
             # Check desired type of predictions
@@ -124,11 +123,11 @@ class OrderedRandomForest(BaseOrderedForest):
                 pred_final = probs
                 var_final = variance
             else:
-                # convert in-sample probabilities into class predictions 
+                # convert in-sample probabilities into class predictions
                 # ("ordered classification")
                 pred_final = probs.argmax(axis=1) + 1
         # Remaining case: X is not None
-        else:    
+        else:
             # If honesty has not been used, used standard predict function
             # from sklearn or econML
             if not self.honesty:
@@ -153,20 +152,20 @@ class OrderedRandomForest(BaseOrderedForest):
             class_probs[class_probs < 0] = 0
             # normalize predictions to sum to 1 after non-negativity correction
             class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
-            
+
             # Check desired type of predictions (applies only to cases where
             # inference = false)
             if prob:
                 # Take in-sample predictions and variance
                 pred_final = class_probs
             else:
-                # convert in-sample probabilities into class predictions 
+                # convert in-sample probabilities into class predictions
                 # ("ordered classification")
                 pred_final = class_probs.argmax(axis=1) + 1
-            
-            # Last step: Compute variance of predicitons 
+
+            # Last step: Compute variance of predicitons
             # If flag_newdata = True, variance can be computed in one step.
-            # Otherwise use same variance method as in fit function which 
+            # Otherwise use same variance method as in fit function which
             # accounts for splitting in training and honest sample
             if inference and prob:
                 # compute variance
@@ -223,7 +222,7 @@ class OrderedRandomForest(BaseOrderedForest):
         result : dict
                  Dictionary containing results of marginal effects estimation.
                  Use result.get("...") with "effects", "variances",
-                 "std_errors", "t-values", "p-values", "ci-up" or "ci-down" to 
+                 "std_errors", "t-values", "p-values", "ci-up" or "ci-down" to
                  extract arrays of marginal effects, variances, standard
                  errors, t-values, p-values or upper and lower confidence
                  intervals, respectively.
@@ -316,10 +315,9 @@ class OrderedRandomForest(BaseOrderedForest):
 
         # check whether eval_point is defined correctly
         if isinstance(eval_point, str):
-            if not (eval_point == 'mean' or eval_point == 'atmean' 
-                or eval_point == 'atmedian'):
+            if eval_point not in ('mean', 'atmean', 'atmedian'):
                 # raise value error
-                raise ValueError("eval_point must be one of 'mean', 'atmean' " 
+                raise ValueError("eval_point must be one of 'mean', 'atmean' "
                                  "or 'atmedian', got '%s'" % eval_point)
         else:
             # raise value error
@@ -354,7 +352,7 @@ class OrderedRandomForest(BaseOrderedForest):
 
         # get the number of observations in X
         n_samples = _num_samples(X_eval)
-        
+
         # check if X is continuous, dummy or categorical
         # first find number of unique values per column
         X_eval_sort = np.sort(X_eval, axis=0)
@@ -411,11 +409,11 @@ class OrderedRandomForest(BaseOrderedForest):
         # check X_min
         X_min = np.repeat(np.min(X_est, axis=0).reshape(1,-1), X_rows, axis=0)
         # check if X_up is within the range X_min and X_max
-        # If some X_up is larger than the max in X_est, replace entry in X_up 
+        # If some X_up is larger than the max in X_est, replace entry in X_up
         # by this max value of X_est. If some X_up is smaller than the min in
         # X_est, replace entry in X_up by this min value + window * X_sd
         X_up[:, X_eval_ind] = (
-            (X_up[:, X_eval_ind] < X_max[:, X_eval_ind])*X_up[:, X_eval_ind]+ 
+            (X_up[:, X_eval_ind] < X_max[:, X_eval_ind])*X_up[:, X_eval_ind]+
             (X_up[:, X_eval_ind] >= X_max[:, X_eval_ind])*X_max[:, X_eval_ind]
             )
         X_up[:, X_eval_ind] = (
@@ -433,13 +431,13 @@ class OrderedRandomForest(BaseOrderedForest):
             (X_down[:, X_eval_ind]>=X_max[:, X_eval_ind])*
             (X_max[:, X_eval_ind] - window * X_sd[:, X_eval_ind])
             )
-        
+
         # Adjust for dummies
         X_up[:, np.intersect1d(X_dummy, X_eval_ind)] = np.max(
             X_eval[:, np.intersect1d(X_dummy, X_eval_ind)], axis=0)
         X_down[:, np.intersect1d(X_dummy, X_eval_ind)] = np.min(
             X_eval[:, np.intersect1d(X_dummy, X_eval_ind)], axis=0)
-        
+
         # Adjust for categorical variables
         X_up[:, np.intersect1d(X_cat, X_eval_ind)] = np.ceil(
             X_up[:, np.intersect1d(X_cat, X_eval_ind)])
@@ -450,7 +448,7 @@ class OrderedRandomForest(BaseOrderedForest):
         # increase the window size by 1% iteratively until no X_up==X_down
         wider_window = window + 0.01
         # start the while loop
-        while (np.any(X_up[:, X_eval_ind] == X_down[:, X_eval_ind])):
+        while np.any(X_up[:, X_eval_ind] == X_down[:, X_eval_ind]):
             # adjust to higher share of SD
             X_up[:, X_eval_ind] = (
                 (X_up[:, X_eval_ind]>X_down[:, X_eval_ind])*X_up[:, X_eval_ind]+
@@ -482,7 +480,7 @@ class OrderedRandomForest(BaseOrderedForest):
             if wider_window > 1:
                 # break here
                 break
-        
+
         ## Compute predictions
         # Create storage arrays to save predictions
         forest_pred_up = np.empty((len(X_eval_ind), self.n_class-1))
@@ -552,11 +550,11 @@ class OrderedRandomForest(BaseOrderedForest):
                     forest_pred_down_x_id, axis=0)
 
             # Compute means of weights
-            forest_weights_up = {r: {k: np.mean(v, axis=0) for k,v in 
-                                     forest_weights_up[r].items()} for r in 
+            forest_weights_up = {r: {k: np.mean(v, axis=0) for k,v in
+                                     forest_weights_up[r].items()} for r in
                                  forest_weights_up.keys()}
-            forest_weights_down = {r: {k: np.mean(v, axis=0) for k,v in 
-                                     forest_weights_down[r].items()} for r in 
+            forest_weights_down = {r: {k: np.mean(v, axis=0) for k,v in
+                                     forest_weights_down[r].items()} for r in
                                  forest_weights_down.keys()}
 
         # ORF predictions for forest_pred_up
@@ -590,7 +588,7 @@ class OrderedRandomForest(BaseOrderedForest):
         # normalize predictions to sum up to 1 after non-negativity correction
         forest_pred_down = forest_pred_down / forest_pred_down.sum(
             axis=1).reshape(-1, 1)
-        
+
         ## Compute marginal effects from predictions
         # compute difference between up and down (numerator)
         forest_pred_diff_up_down = forest_pred_up - forest_pred_down
@@ -603,10 +601,10 @@ class OrderedRandomForest(BaseOrderedForest):
         # scaling_factor[np.intersect1d(X_cat, X_eval_ind), :] = 1
         # Scale the differences to get the marginal effects
         marginal_effects_scaled = forest_pred_diff_up_down / scaling_factor
-        
+
         # redefine all effect results as floats
         margins = marginal_effects_scaled.astype(float)
-        
+
         if self.inference:
             ## variance for the marginal effects
             # compute prerequisities for variance of honest marginal effects
@@ -628,7 +626,7 @@ class OrderedRandomForest(BaseOrderedForest):
                 for class_idx in range(1, self.n_class, 1):
                     #subtract the weights according to the ME formula:
                     forest_weights_diff_up_down = (
-                        forest_weights_up[x_id][class_idx] - 
+                        forest_weights_up[x_id][class_idx] -
                         forest_weights_down[x_id][class_idx])
                     # Get binary outcoms of honest sample
                     outcome_binary_est = self.forest_['outcome_binary_est'][
@@ -714,9 +712,9 @@ class OrderedRandomForest(BaseOrderedForest):
                                 class_idx].reshape(-1, 1)
 
             # standard deviations
-            sd_me = np.sqrt(variance_me)     
+            sd_me = np.sqrt(variance_me)
             # t values and p values (control for division by zero)
-            t_values = np.divide(margins, sd_me, out=np.zeros_like(margins), 
+            t_values = np.divide(margins, sd_me, out=np.zeros_like(margins),
                                 where=sd_me!=0)
             # p values
             p_values = 2*stats.norm.sf(np.abs(t_values))
@@ -758,27 +756,27 @@ class OrderedRandomForest(BaseOrderedForest):
             # print marginal effects nicely
             if not self.inference:
                 print('-' * 70,
-                      'Marginal Effects of OrderedForest, evaluation point: '+ 
+                      'Marginal Effects of OrderedForest, evaluation point: '+
                       eval_point, '-' * 70, 'Effects:', '-' * 70,
-                      pd.DataFrame(data=margins, 
-                                   index=index_X, 
+                      pd.DataFrame(data=margins,
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 70, sep='\n')
             else:
                 print('-' * 70,
-                      'Marginal Effects of OrderedForest, evaluation point: '+ 
+                      'Marginal Effects of OrderedForest, evaluation point: '+
                       eval_point, '-' * 70, 'Effects:', '-' * 70,
-                      pd.DataFrame(data=margins, 
-                                   index=index_X, 
+                      pd.DataFrame(data=margins,
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 70,'Standard errors:', '-' * 70,
-                      pd.DataFrame(data=sd_me, 
-                                   index=index_X, 
+                      pd.DataFrame(data=sd_me,
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 70, sep='\n')
 
         return results
-    
+
     # Function to predict via sklearn
     def _predict_default(self, X, n_samples):
         # create an empty array to save the predictions
@@ -786,15 +784,15 @@ class OrderedRandomForest(BaseOrderedForest):
         for class_idx in range(1, self.n_class, 1):
             # get in-sample predictions, i.e. out-of-bag predictions
             probs[:,class_idx-1] = self.forest_['forests'][class_idx].predict(
-                X=X).squeeze() 
+                X=X).squeeze()
         return probs
-        
+
 
     # Function to predict via leaf means
     def _predict_leafmeans(self, X, n_samples):
         # create an empty array to save the predictions
         probs = np.empty((n_samples, self.n_class-1))
-        # Run new Xs through estimated train forest and compute 
+        # Run new Xs through estimated train forest and compute
         # predictions based on honest sample. No need to predict
         # weights, get predictions directly through leaf means.
         # Loop over classes
@@ -802,15 +800,15 @@ class OrderedRandomForest(BaseOrderedForest):
             # Get leaf IDs for new data set
             forest_apply = self.forest_['forests'][class_idx].apply(X)
             # generate grid to read out indices column by column
-            grid = np.meshgrid(np.arange(0, self.n_estimators), 
+            grid = np.meshgrid(np.arange(0, self.n_estimators),
                                np.arange(0, n_samples))[0]
             # assign leaf means to indices
             y_hat = self.forest_['fitted'][class_idx][forest_apply, grid]
             # Average over trees
-            probs[:, class_idx-1] = np.mean(y_hat, axis=1)  
+            probs[:, class_idx-1] = np.mean(y_hat, axis=1)
         return probs
 
-        
+
     # Function to predict via weights
     def _predict_weights(self, X, n_samples):
         # create an empty array to save the predictions
@@ -883,9 +881,9 @@ class OrderedRandomForest(BaseOrderedForest):
         Parameters
         ----------
         item : Nonetype or dict
-               Object that should be summarized: Either prediction or margin 
+               Object that should be summarized: Either prediction or margin
                output or None. If None then forest parameters will be printed.
-               
+
         Returns
         -------
         None.
@@ -904,8 +902,8 @@ class OrderedRandomForest(BaseOrderedForest):
 
         if item is None:
             # print the result
-            print('-' * 50,'Summary of the OrderedForest estimation', 
-                  '-' * 50, 
+            print('-' * 50,'Summary of the OrderedForest estimation',
+                  '-' * 50,
                   sep='\n')
             print('%-18s%-15s' % ('type:', 'OrderedForest'))
             print('%-18s%-15s' % ('categories:', self.n_class))
@@ -929,13 +927,13 @@ class OrderedRandomForest(BaseOrderedForest):
             print('%-18s%-15s' % ('accuracy:',np.round(
                 float(self.measures['accuracy']),3)))
             print('-' * 50)
-        
+
         elif item['output']=='predict':
             print('-' * 60, 'Summary of the OrderedForest predictions',
                   '-' * 60, sep='\n')
-            print('%-18s%-15s' % ('type:', 
+            print('%-18s%-15s' % ('type:',
                                   'OrderedForest predictions'))
-            print('%-18s%-15s' % ('prediction_type:', 'Probability' if 
+            print('%-18s%-15s' % ('prediction_type:', 'Probability' if
                                   item['prob'] else 'Class'))
             print('%-18s%-15s' % ('categories:', self.n_class))
             print('%-18s%-15s' % ('build:', 'Subsampling' if not
@@ -951,7 +949,7 @@ class OrderedRandomForest(BaseOrderedForest):
             print('%-18s%-15s' % ('sample_size:', np.shape(
                 item['predictions'])[0]))
             print('-' * 60)
-        
+
         elif item['output']=='margin':
             string_seq_X = [str(x) for x in np.arange(1,np.shape(
                 item['effects'])[0]+1)]
@@ -960,10 +958,10 @@ class OrderedRandomForest(BaseOrderedForest):
                 index_X = self.feature_names[item['X_eval']]
             string_seq_cat = [str(x) for x in np.arange(1,self.n_class+1)]
             columns_X = ['Cat' + sub for sub in string_seq_cat]
-            print('-' * 60, 
+            print('-' * 60,
                   'Summary of the OrderedForest marginal effects',
                   '-' * 60, sep='\n')
-            print('%-18s%-15s' % ('type:', 
+            print('%-18s%-15s' % ('type:',
                                   'OrderedForest marginal effects'))
             print('%-18s%-15s' % ('eval_point:', item['eval_point']))
             print('%-18s%-15s' % ('window:', item['window']))
@@ -978,39 +976,39 @@ class OrderedRandomForest(BaseOrderedForest):
             print('%-18s%-15s' % ('honesty:', self.honesty))
             print('%-18s%-15s' % ('honesty_fraction:', self.honesty_fraction))
             print('%-18s%-15s' % ('inference:', self.inference))
-            print('-' * 60,'Marginal effects:', 
-                  pd.DataFrame(data=item['effects'], 
-                               index=index_X, 
+            print('-' * 60,'Marginal effects:',
+                  pd.DataFrame(data=item['effects'],
+                               index=index_X,
                                columns=['Cat' + sub for sub in string_seq_cat]),
                   '-' * 60, sep='\n')
             if item['std_errors'] is not None:
-                print('Standard errors:', 
-                      pd.DataFrame(data=item['std_errors'], 
-                                   index=index_X, 
+                print('Standard errors:',
+                      pd.DataFrame(data=item['std_errors'],
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 60, sep='\n')
             if item['t-values'] is not None:
-                print('t-values:', 
-                      pd.DataFrame(data=item['t-values'], 
-                                   index=index_X, 
+                print('t-values:',
+                      pd.DataFrame(data=item['t-values'],
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 60, sep='\n')
             if item['p-values'] is not None:
-                print('p-values:', 
-                      pd.DataFrame(data=item['p-values'], 
-                                   index=index_X, 
+                print('p-values:',
+                      pd.DataFrame(data=item['p-values'],
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 60, sep='\n')
             if item['ci-up'] is not None:
-                print('ci-up:', 
-                      pd.DataFrame(data=item['ci-up'], 
-                                   index=index_X, 
+                print('ci-up:',
+                      pd.DataFrame(data=item['ci-up'],
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 60, sep='\n')
             if item['ci-down'] is not None:
-                print('ci-down:', 
-                      pd.DataFrame(data=item['ci-down'], 
-                                   index=index_X, 
+                print('ci-down:',
+                      pd.DataFrame(data=item['ci-down'],
+                                   index=index_X,
                                    columns=columns_X),
                       '-' * 60, sep='\n')
 
@@ -1039,7 +1037,7 @@ class OrderedRandomForest(BaseOrderedForest):
                             self.forest_['probs']), axis=1))
 
         # Convert to wide format
-        # New columns: 
+        # New columns:
         #   0 = true outcome
         #   variable = category where prob is analysed
         #   value = probability of specific category
@@ -1056,19 +1054,20 @@ class OrderedRandomForest(BaseOrderedForest):
         # Compute average prediction per Density-Outcome combination
         df_plot_mean = df_plot_long.copy()
         df_plot_mean['Probability'] = df_plot_mean.groupby(
-            ['Density','Outcome'])['Probability'].transform('mean') 
+            ['Density','Outcome'])['Probability'].transform('mean')
 
         # Plot using plotnine package
         fig = (ggplot(df_plot_long, aes(x = 'Probability', fill = 'Density'))
          + geom_density(alpha = 0.4)
          + aes(y = "..scaled..")
          + facet_wrap("Outcome", ncol = 1)
-         + geom_vline(df_plot_mean, aes(xintercept = "Probability", color = "Density"), linetype="dashed")         
+         + geom_vline(df_plot_mean, aes(xintercept = "Probability",
+                                        color = "Density"), linetype="dashed")
          + xlab("Predicted Probability")
          + ylab("Probability Mass")
          + theme_bw()
          + theme(strip_background = element_rect(fill = "#EBEBEB"))
-         + theme(legend_direction = "horizontal", 
+         + theme(legend_direction = "horizontal",
                  legend_position = (0.5, -0.03))
          + ggtitle("Distribution of OrderedForest Probability Predictions")
          )

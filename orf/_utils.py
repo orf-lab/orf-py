@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 
 # Define function to produce data sets of different size
-def make_ordered_regression(n_samples=1000, 
+def make_ordered_regression(n_samples=1000,
                             y_classes=3,
-                            p_cont=1, 
-                            p_cat=1, 
+                            p_cont=1,
+                            p_cat=1,
                             cat_classes=3,
                             p_binary=1,
-                            noise=True, 
+                            noise=True,
                             seed=None):
     """
     Generate example data for Ordered Forest estimation.
@@ -29,7 +29,7 @@ def make_ordered_regression(n_samples=1000,
         The number of continuous covariates drawn from a normal
         distribution. The default is 1.
     p_cat : integer
-        The number of categorical covariates drawn from a binomial 
+        The number of categorical covariates drawn from a binomial
         distribution. The default is 1.
     cat_classes : integer
         The number of classes of the categorical variable(s).
@@ -49,7 +49,7 @@ def make_ordered_regression(n_samples=1000,
         The generated covariates/features.
     y : ndarray
         The generated outcomes.
-        
+
     Notes
     -------
     This functions generates an example dataset of size `n_sample`,
@@ -58,8 +58,8 @@ def make_ordered_regression(n_samples=1000,
     (DGP) may include continuous (`p_cont`), binary (`p_binary`) and
     categorical (`p_cat`) features. In addition, it is possible to include
     a noise variable in the DGP that does not affect the outcome variable
-    by specifying `noise=True`. 
-    
+    by specifying `noise=True`.
+
     Example
     -------
     ```py
@@ -75,23 +75,23 @@ def make_ordered_regression(n_samples=1000,
 
     # Set seed
     seed = np.random.default_rng(seed=seed)
-    
+
     # Draw covariates
     cont = seed.normal(0, 1, size=(n_samples, p_cont))
     cat = seed.binomial(cat_classes-1, 0.5, size=(n_samples, p_cat))+1
     binary = seed.binomial(1, 0.5, size=(n_samples, p_binary))
-    
+
     # Combine deterministic covariates
     X_det = np.hstack([cont, cat, binary])
     if noise:
         X = np.hstack([X_det, seed.normal(0, 10, size=(n_samples, 1))])
     else:
         X = X_det
-    
+
     # Generate continuous outcome with logistic error
     y = np.sum(X_det, axis=1) + seed.logistic(0, 1, n_samples)
     # Thresholds for continuous outcome
     y = pd.qcut(y, y_classes, labels=False) + 1
-    
+
     # Return X and Y
     return X, y

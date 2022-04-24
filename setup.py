@@ -21,7 +21,7 @@ setup(
           'plotnine>=0.8.0',
           'multiprocessing>=2.6.2.1',
           'sharedmem>=0.3.8',
-          
+
       ],
   classifiers=[
     'Development Status :: 4 - Beta',

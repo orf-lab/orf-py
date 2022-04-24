@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 orf: Ordered Random Forest.
 
@@ -26,7 +25,7 @@ from multiprocessing import cpu_count, Lock
 
 
 # %% Class definition
-    
+
 # define BaseOrderedForest class (BaseEstimator allows to call get_params and set_params)
 class BaseOrderedForest(BaseEstimator):
     """
@@ -102,7 +101,7 @@ class BaseOrderedForest(BaseEstimator):
             else:
                 # raise value error
                 raise ValueError("min_samples_leaf must be an integer >= 1 or "
-                                 "a float within (0,1), got %s" 
+                                 "a float within (0,1), got %s"
                                  % min_samples_leaf)
         elif isinstance(min_samples_leaf, float):
             # check if its at least 1
@@ -112,12 +111,12 @@ class BaseOrderedForest(BaseEstimator):
             else:
                 # raise value error
                 raise ValueError("min_samples_leaf must be an integer >= 1 or "
-                                 "a float within (0,1), got %s" 
+                                 "a float within (0,1), got %s"
                                  % min_samples_leaf)
         else:
             # raise value error
             raise ValueError("min_samples_leaf must be an integer >= 1 or "
-                             "a float within (0,1), got %s" 
+                             "a float within (0,1), got %s"
                              % min_samples_leaf)
 
         # check share of features in splitting
@@ -238,7 +237,7 @@ class BaseOrderedForest(BaseEstimator):
             # check max available cores
             max_jobs = cpu_count()
             # check if it is -1
-            if (n_jobs == -1):
+            if n_jobs == -1:
                 # set max - 1 as default
                 self.n_jobs = max_jobs - 1
             # check if jobs are admissible for the machine
@@ -265,8 +264,8 @@ class BaseOrderedForest(BaseEstimator):
         # use this to initialize seed for honest splitting: this is useful when
         # we want to obtain the same splits later on
         self.subsample_random_seed = self.random_state.randint(max_int)
-        
-    
+
+
     # %% Fit function
     # function to estimate OrderedForest
     def fit(self, X, y):
@@ -292,7 +291,7 @@ class BaseOrderedForest(BaseEstimator):
 
         # Get the number of outcome classes
         self.n_class = nclass = len(y_values)
-        # Next, ensure that y is a vector of continuous integers starting at 
+        # Next, ensure that y is a vector of continuous integers starting at
         # 1 up to nclass
         # Check if y consists of integers
         if all(isinstance(x, (np.integer)) for x in y_values):
@@ -469,29 +468,6 @@ class BaseOrderedForest(BaseEstimator):
                                         0, self.n_estimators))
                             # assign honest predictions, i.e. fitted values
                             fitted[class_idx] = np.vstack(leaf_means).T
-
-# =============================================================================
-#                             # Loop over trees in parallel via 'numpy_joblib_shared'
-#                             # storage as numpy array
-#                             leaf_means = np.zeros((max_id, self.n_estimators))
-#                             _lock = Lock()  # initiate lock
-#                             # parallel in shared memory
-#                             Parallel(
-#                                 n_jobs=self.n_jobs,
-#                                 backend="threading"
-#                                 )(delayed(
-#                                     self._honest_fit_numpy_shared)(
-#                                         tree=tree,
-#                                         forest_apply=forest_apply,
-#                                         outcome_ind_est=outcome_ind_est,
-#                                         max_id=max_id,
-#                                         shared_object=leaf_means,
-#                                         lock=_lock)
-#                                         for tree in range(self.n_estimators))
-#                             # assign honest predictions (honest fitted values)
-#                             fitted[class_idx] = leaf_means
-# =============================================================================
-
                         else:
                             # storage as numpy array
                             leaf_means = np.zeros((max_id, self.n_estimators))
@@ -509,22 +485,6 @@ class BaseOrderedForest(BaseEstimator):
                                            tree] = leaf_sums/leaf_n
                             # assign honest predictions (honest fitted values)
                             fitted[class_idx] = leaf_means
-
-# =============================================================================
-#                         if self.pred_method == 'numpy_loop':
-#                             # storage as list
-#                             leaf_means = [np.nan for _ in range(self.n_estimators)]
-#                             # Loop over trees
-#                             for tree in range(self.n_estimators):
-#                                 # compute preds
-#                                 leaf_means[tree] = self._honest_fit_numpy_func(
-#                                     tree=tree,
-#                                     forest_apply=forest_apply,
-#                                     outcome_ind_est=outcome_ind_est,
-#                                     max_id=max_id)
-#                             # assign honest predictions (honest fitted values)
-#                             fitted[class_idx] = np.vstack(leaf_means).T
-# =============================================================================
 
                         # Compute predictions for whole sample: both tr and est
                         # Get leaf IDs for the whole set of observations
@@ -548,7 +508,7 @@ class BaseOrderedForest(BaseEstimator):
         class_probs[class_probs < 0] = 0
         # normalize predictions to sum up to 1 after non-negativity correction
         class_probs = class_probs / class_probs.sum(axis=1).reshape(-1, 1)
-        
+
         # %% Compute variance of predicitons if inference = True
         # outcome need to come from the honest sample here, outcome_binary_est
         if self.inference:
@@ -648,7 +608,7 @@ class BaseOrderedForest(BaseEstimator):
         acc = np.mean(y == class_pred)
 
         # create te confusion matrix
-        # First generate onehot matrice of y      
+        # First generate onehot matrice of y
         y_onehot = OneHotEncoder(sparse=False).fit_transform(y.reshape(-1, 1))
         # Find unique predicted classes
         class_pred_u = np.unique(class_pred)
@@ -668,7 +628,7 @@ class BaseOrderedForest(BaseEstimator):
         # Compute dot product of these matrices to obtain confusion matrix
         confusion_mat = np.dot(np.transpose(y_onehot), class_pred_onehot)
         labels = ['Class ' + str(c_idx) for c_idx in y_values]
-        self.confusion = pd.DataFrame(confusion_mat, 
+        self.confusion = pd.DataFrame(confusion_mat,
                                       index=labels, columns=labels)
 
         # wrap the results into a dataframe
@@ -682,7 +642,7 @@ class BaseOrderedForest(BaseEstimator):
     # %% In-class honesty and weight functions
     # Function to compute honest predictions.
     def _honest_fit_numpy_func(self, tree, forest_apply, outcome_ind_est,
-                              max_id):
+                               max_id):
         """Compute the honest leaf means using numpy."""
 
         # create an empty array to save the leaf means
@@ -727,7 +687,7 @@ class BaseOrderedForest(BaseEstimator):
 
     # Function to compute honest weights using numpy.
     def _honest_weight_numpy(self, tree, forest_apply, forest_apply_all,
-                            n_samples, n_est):
+                             n_samples, n_est):
         """Compute the honest weights using numpy."""
 
         # extract vectors of leaf IDs
@@ -738,7 +698,7 @@ class BaseOrderedForest(BaseEstimator):
         leaf_IDs_honest_u = np.unique(leaf_IDs_honest)
         leaf_IDs_all_u = np.unique(leaf_IDs_all)
 
-        if np.array_equal(leaf_IDs_honest_u, 
+        if np.array_equal(leaf_IDs_honest_u,
                           leaf_IDs_all_u):
             leaf_IDs_honest_ext = leaf_IDs_honest
             leaf_IDs_all_ext = leaf_IDs_all
