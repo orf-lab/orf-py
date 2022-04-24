@@ -4,7 +4,7 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## To Do:
 
-- run code analysis and adjust accordingly (G)
+- include the new orf logo into the html documentation (F)
 - check python versions 3.8. 3.9 and 3.10 (G)
 - 'codeY typo in R package description of the orf function (G)
 - check how to handle categorical variables in R (condition integer and number of unique values OR optional array indicating categorical variables by the user) (G)
@@ -15,6 +15,7 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Done:
 
+- run code analysis and adjust accordingly (G)
 - prepare files for PyPi (G)
 - clarify licence type (G)
 - changed structure for PyPi upload (G)
