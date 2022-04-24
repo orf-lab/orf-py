@@ -81,4 +81,4 @@ __version__ = "0.1.0"
 __module__ = 'orf'
 __author__ = "Michael Lechner, Fabian Muny & Gabriel Okasa"
 __copyright__ = "Copyright (c) 2022, Michael Lechner, Fabian Muny & Gabriel Okasa"
-__license__ = ""
+__license__ = "MIT License"

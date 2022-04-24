@@ -4,7 +4,6 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## To Do:
 
-- clarify licence type
 - run code analysis and adjust accordingly (G)
 - check python versions 3.8. 3.9 and 3.10 (G)
 - 'codeY typo in R package description of the orf function (G)
@@ -16,6 +15,8 @@ To-do list and comments for the Python implementation of the Ordered Forest esti
 
 ## Done:
 
+- prepare files for PyPi (G)
+- clarify licence type (G)
 - changed structure for PyPi upload (G)
 - changed example_data to make_ordered_regression (G)
 - revert the order of functions and classes in the html documentation (F)
