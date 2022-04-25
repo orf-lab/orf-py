@@ -1,5 +1,5 @@
-<img src='docs/images/orf-logo.png' align="right" height="120" />
 # orf: ordered random forests 
+<a href="https://github.com/orf-lab/orf-py"> <img src='docs/images/orf-logo.png' align="right" height="120" /></a>
 
 Welcome to the repository of the `Python` package `orf` for random forest estimation
 of the ordered choice models. For the `R` version of the `orf` package 
