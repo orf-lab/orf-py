@@ -13,15 +13,12 @@ setup(
   keywords = ['ordered forest', 'ordered choice', 'random forest'],
   install_requires=[
           'numpy>=1.20.3',
-          'pandas>=1.3.2',
-          'scipy>=1.7.1',
-          'scikit-learn>=0.24.2',
-          'econml>=0.12.0',
-          'joblib>=1.0.1',
+          'pandas>=1.4.2',
+          'scipy>=1.8.0',
+          'scikit-learn>=1.0.2',
+          'econml>=0.13.0',
+          'joblib>=1.1.0',
           'plotnine>=0.8.0',
-          'multiprocessing>=2.6.2.1',
-          'sharedmem>=0.3.8',
-
       ],
   classifiers=[
     'Development Status :: 4 - Beta',

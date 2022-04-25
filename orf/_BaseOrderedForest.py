@@ -8,8 +8,6 @@ Definition of base ordered forest estimator and fit function.
 """
 
 # import modules
-import sharedmem
-
 import numpy as np
 import pandas as pd
 

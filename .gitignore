@@ -14,4 +14,9 @@
 
 # data from testing, but keep the folder
 /dev/_R/results/*
-!/dev/_R/results/.gitkeep 
+!/dev/_R/results/.gitkeep
+
+# exclude data from tox
+/.tox/*
+/orf.egg-info/*
+MANIFEST
