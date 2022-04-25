@@ -7,7 +7,7 @@ setup(
   license = 'MIT',
   description = 'orf package implements the Ordered Forest estimator for random forest estimation of the ordered choice models.',
   author = 'Michael Lechner, Fabian Muny & Gabriel Okasa',
-  author_email = 'your.email@domain.com',
+  author_email = 'fabian.muny@unisg.ch',
   url = 'https://github.com/fmuny/ORFpy',
   download_url = 'https://github.com/fmuny/ORFpy/archive/refs/tags/v0.1.0.tar.gz',
   keywords = ['ordered forest', 'ordered choice', 'random forest'],

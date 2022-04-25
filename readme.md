@@ -1,5 +1,5 @@
 # orf: ordered random forests <a href='https://github.com/orf-lab'><img
-src='https://github.com/fmuny/ORFpy/blob/main/images/orf-logo.png'
+src='docs/images/orf-logo.png'
 align="right" height="120" /></a>
 
 Welcome to the repository of the `Python` package `orf` for random forest estimation
@@ -39,7 +39,7 @@ The example below demonstrates the basic functionality of the Ordered Forest.
 import orf
 
 # load example data
-features, outcome = orf.example_data()
+features, outcome = orf.make_ordered_regression()
 
 # initiate Ordered Forest with custom settings
 oforest = orf.OrderedForest(n_estimators=1000, min_samples_leaf=5,
