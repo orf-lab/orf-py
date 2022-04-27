@@ -33,7 +33,8 @@
  * plotnine (>=0.8.0)
  
  In case of an installation failure due to dependency 
- issues, consider installing the package in a virtual 
+ issues or conflicts with Anaconda distribution,
+ consider installing the package in a virtual 
  environment or try `pip install orf --user`.
  
  The implementation relies on Python 3 and is compatible with 
