@@ -1,5 +1,5 @@
 <h1>orf: ordered random forests 
-<a href="https://github.com/orf-lab/orf-py"> <img src='docs/images/orf-logo.png' align="right" height="120" />
+<a href="https://github.com/orf-lab/orf-py"> <img src='https://raw.githubusercontent.com/fmuny/ORFpy/main/docs/images/orf-logo.png' align="right" height="120" />
 </a>
 </h1>
 
@@ -24,11 +24,23 @@ libraries.
 
 ## Installation
 
-In order to install the latest `PyPi` released version run:
+In order to install the latest `PyPi` released version run
 ```
 pip install orf
-```
-in the terminal.
+ ```
+in the terminal. `orf` requires the following dependencies:
+     
+ * numpy (<1.22.0,>=1.21.0)
+ * pandas (>=1.4.2)
+ * scipy (<1.8.0,>=1.7.2)
+ * scikit-learn (>=1.0.2)
+ * econml (>=0.13.0)
+ * joblib (>=1.1.0)
+ * plotnine (>=0.8.0)
+ 
+In case of an installation failure due to dependency 
+issues, consider installing the package in a virtual 
+environment or try `pip install orf --user`.
 
 The implementation relies on Python 3 and is compatible with version 3.8, 3.9 and 3.10.
 

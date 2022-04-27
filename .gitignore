@@ -5,6 +5,9 @@
 *.jpeg
 *.jpg
 
+# excel files
+*.xlsx
+
 # osx files
 .DS_Store
 
@@ -20,3 +23,6 @@
 /.tox/*
 /orf.egg-info/*
 MANIFEST
+
+# exclude folder with original (unadjusted) documentation created by pdoc
+/docs/orf/*

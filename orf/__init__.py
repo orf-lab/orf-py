@@ -22,8 +22,22 @@
  ```
  pip install orf
  ```
- in the terminal.
-
+ in the terminal. `orf` requires the following dependencies:
+     
+ * numpy (<1.22.0,>=1.21.0)
+ * pandas (>=1.4.2)
+ * scipy (<1.8.0,>=1.7.2)
+ * scikit-learn (>=1.0.2)
+ * econml (>=0.13.0)
+ * joblib (>=1.1.0)
+ * plotnine (>=0.8.0)
+ 
+ In case of an installation failure due to dependency 
+ issues, consider installing the package in a virtual 
+ environment or try `pip install orf --user`.
+ 
+ The implementation relies on Python 3 and is compatible with 
+ version 3.8, 3.9 and 3.10.
 
  Examples
  ----------------------------
@@ -77,7 +91,7 @@
 from orf.OrderedForest import OrderedForest
 from orf._utils import make_ordered_regression
 __all__ = ["OrderedForest", "make_ordered_regression"]
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __module__ = 'orf'
 __author__ = "Michael Lechner, Fabian Muny & Gabriel Okasa"
 __copyright__ = "Copyright (c) 2022, Michael Lechner, Fabian Muny & Gabriel Okasa"
