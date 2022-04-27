@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 # read the contents of your README file
 from pathlib import Path
@@ -12,8 +12,8 @@ setup(
   version = '0.1.1',
   license = 'MIT',
   description = 'orf package implements the Ordered Forest estimator for random forest estimation of the ordered choice models.',
-  long_description=long_description,
   long_description_content_type='text/markdown',
+  long_description=long_description,
   author = 'Michael Lechner, Fabian Muny & Gabriel Okasa',
   author_email = 'fabian.muny@unisg.ch',
   url = 'https://orf-lab.github.io',
