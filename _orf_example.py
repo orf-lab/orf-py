@@ -7,11 +7,6 @@ Showcase application of the Ordered Forest estimator.
 """
 
 # import modules
-import os
-# path="D:\switchdrive\Projects\ORF_Python\ORFpy"
-# path = "/home/okasag/Documents/HSG/ORF/python/ORFpy"
-path = '/Users/okasag/Desktop/HSG/orf/python/ORFpy'
-os.chdir(path)
 import orf
 
 # get example data

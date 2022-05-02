@@ -21,6 +21,8 @@ os.chdir(path)
 # load the ordered forest
 import orf
 from orf.OrderedForest import OrderedForest
+# pip orf or dev version orf - set as needed for testing
+dev = True
 
 # %% read in data
 # read in synthetic test data based on the orf package in R
@@ -122,7 +124,8 @@ for data_idx in data_types:
                                  str(inference_idx).upper() + '_H_' +
                                  str(honesty_idx).upper() + '_R_' +
                                  str(replace_idx).upper() + '.png'),
-                       path=path + '/dev/_R/results/')
+                       path=(path + '/dev/_R/results/' + 
+                       'dev/' if dev else 'pip/'))
 
                 # save the results for fit
                 for key, value in fit_results.items():
@@ -132,8 +135,10 @@ for data_idx in data_types:
                     if value is None:
                         value = [0]
                     # save the results
-                    np.savetxt(fname=(path + '/dev/_R/results/py_' + data_idx
-                                      + '_' + str(key) + '_I_' +
+                    np.savetxt(fname=(path + '/dev/_R/results/' +
+                                      ('dev/' if dev else 'pip/') +
+                                      'py_' + data_idx +
+                                      '_' + str(key) + '_I_' +
                                       str(inference_idx).upper() + '_H_' +
                                       str(honesty_idx).upper() + '_R_' +
                                       str(replace_idx).upper() + '.csv'),
@@ -147,8 +152,10 @@ for data_idx in data_types:
                     if value is None:
                         value = [0]
                     # save the results
-                    np.savetxt(fname=(path + '/dev/_R/results/py_' + data_idx
-                                      + '_' + str(key) + '_I_' +
+                    np.savetxt(fname=(path + '/dev/_R/results/' +
+                                      ('dev/' if dev else 'pip/') +
+                                      'py_' + data_idx +
+                                      '_' + str(key) + '_I_' +
                                       str(inference_idx).upper() + '_H_' +
                                       str(honesty_idx).upper() + '_R_' +
                                       str(replace_idx).upper() + '.csv'),

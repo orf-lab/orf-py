@@ -17,8 +17,7 @@ from orf.OrderedForest import OrderedForest
 # initiate the class with tuning parameters
 self = OrderedForest(n_estimators=1000, min_samples_leaf=5, max_features=0.3,
                      replace=False, sample_fraction=0.5, honesty=True,
-                     n_jobs=1, pred_method='numpy_loop', inference=False,
-                     weight_method='numpy_loop')
+                     n_jobs=1, inference=False)
 
 # Define function to produce data sets of different size
 def example_data(seed, n, p_cont, p_cat, p_binary, noise=True, y_cat=3,
@@ -80,7 +79,17 @@ X, y = example_data(seed=123, n=1000, p_cont=1, p_cat=1,
                     cat_cat=3)
 
 class_idx = 1
-
+n_estimators=1000
+min_samples_leaf=5
+max_features=None
+replace=False
+sample_fraction=0.5
+honesty=True
+honesty_fraction=0.5
+inference=False
+n_jobs=-1
+random_state=1
+                 
 # save the dataset for comparison reasons as csv
 example_df = pd.DataFrame(pd.concat([y, X], axis=1, ignore_index=True)).rename(
     columns={0: 'y', 1: 'x1', 2: 'x2', 3: 'x3', 4: 'x4'})
