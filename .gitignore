@@ -15,11 +15,10 @@
 /orf/__pycache__/
 *.pyc
 
-# data from testing, but keep the folder
-/dev/_R/results/*
-!/dev/_R/results/.gitkeep
-!/dev/_R/results/dev/.gitkeep
-!/dev/_R/results/pip/.gitkeep
+# data from testing, but keep the folders
+/dev/_R/results/**
+!/dev/_R/results/**/
+!/dev/_R/results/**/.gitkeep
 
 # exclude data from tox
 /.tox/*
