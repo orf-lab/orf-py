@@ -3,7 +3,7 @@ orf: Ordered Random Forests.
 
 Python implementation of the Ordered Forest as in Lechner & Okasa (2019).
 
-Compare Results of the Python Implementation with R Implementation.
+Compare Results of the PyPi Implementation with the Development Implementation.
 """
 
 # %% import modules
@@ -20,8 +20,6 @@ os.chdir(path)
 
 # load the ordered forest
 from orf.OrderedForest import OrderedForest
-# define dev or pip version for testing
-dev = True
 
 # %% benchmark settings
 replace_options = [False, True]
@@ -33,8 +31,8 @@ saved_results = ['orf_pred', 'orf_var', 'orf_rps', 'orf_mse',
                  'margins_effects', 'margins_vars']
 # differences and results
 diffs = {}
-r_results_all = {}
-py_results_all = {}
+pip_results_all = {}
+dev_results_all = {}
 
 # %% read in data
 for result_idx in saved_results:
@@ -61,49 +59,47 @@ for result_idx in saved_results:
                                    str(inference_idx).upper() + '_H_' +
                                    str(honesty_idx).upper() + '_R_' +
                                    str(replace_idx).upper())
-                    # load data from R
-                    r_result = np.array(pd.read_csv(
-                        (path + '/dev/_R/results/' +
-                         ('dev/' if dev else 'pip/') +
-                         'R_' + result_name + '.csv'), header=0))
-                    # save the result into a dictionary
-                    r_results_all[result_name] = r_result
-                    # load data from Python
-                    py_result = np.array(pd.read_csv(
-                        (path + '/dev/_R/results/' +
-                         ('dev/' if dev else 'pip/') +
+                    # load data from pip
+                    pip_result = np.array(pd.read_csv(
+                        (path + '/dev/_R/results/pip/' +
                          'py_' + result_name + '.csv'), header=None))
                     # save the result into a dictionary
-                    py_results_all[result_name] = py_result
+                    pip_results_all[result_name] = pip_result
+                    # load data from dev
+                    dev_result = np.array(pd.read_csv(
+                        (path + '/dev/_R/results/dev/' +
+                         'py_' + result_name + '.csv'), header=None))
+                    # save the result into a dictionary
+                    dev_results_all[result_name] = dev_result
                     # compare the average results for predictions and mse, rps
                     if not result_idx in ['margins_effects', 'margins_vars']:
                         # take difference of means
-                        result_diff = np.abs(np.mean(r_result, axis=0) -
-                                             np.mean(py_result, axis=0))
+                        result_diff = np.abs(np.mean(pip_result, axis=0) -
+                                             np.mean(dev_result, axis=0))
                         # check if the difference is small enough
                         if (np.all(result_diff <= 0.05)):
-                            print('Differences between R and Python for ' +
+                            print('Differences between pip and dev for ' +
                                   result_name + ' are small.')
                         else:
-                            print('Differences between R and Python for ' +
+                            print('Differences between pip and dev for ' +
                                   result_name + ' are NOT small.')
                     else:
                         # compare the absolute differences for margins
-                        result_diff = np.abs(r_result - py_result)
+                        result_diff = np.abs(pip_result - dev_result)
                         # check if the difference is small enough
                         if (np.all(result_diff <= 0.05)):
-                            print('Differences between R and Python for ' +
+                            print('Differences between pip and dev for ' +
                                   result_name + ' are small.')
                         else:
-                            print('Differences between R and Python for ' +
+                            print('Differences between pip and dev for ' +
                                   result_name + ' are NOT small.')
                     # save the difference into a dictionary
                     diffs[result_name] = result_diff
 
 # save the differences and the results themselves separately on disk
-np.save((path + '/dev/_R/results/' + ('dev/' if dev else 'pip/') + 'diffs.npy'), diffs)
-np.save((path + '/dev/_R/results/' + ('dev/' if dev else 'pip/') + 'r_results_all.npy'), r_results_all)
-np.save((path + '/dev/_R/results/' + ('dev/' if dev else 'pip/') + 'py_results_all.npy'), py_results_all)
+np.save((path + '/dev/_R/results/dev/pip_dev_diffs.npy'), diffs)
+np.save((path + '/dev/_R/results/dev/pip_results_all.npy'), pip_results_all)
+np.save((path + '/dev/_R/results/dev/dev_results_all.npy'), dev_results_all)
 
 # %% compare if marginal effects lie within the confidence intervals
 # of the other implementation
@@ -113,27 +109,27 @@ for data_idx in data_types:
     effect_name = data_idx + '_margins_effects_I_TRUE_H_TRUE_R_FALSE'
     var_name = data_idx + '_margins_vars_I_TRUE_H_TRUE_R_FALSE'
     # get the effects
-    r_effects = r_results_all[effect_name]
-    py_effects = py_results_all[effect_name]
+    pip_effects = pip_results_all[effect_name]
+    dev_effects = dev_results_all[effect_name]
     # get the variances
-    r_vars = r_results_all[var_name]
-    py_vars = py_results_all[var_name]
+    pip_vars = pip_results_all[var_name]
+    dev_vars = dev_results_all[var_name]
     # get upper confidence intervals
-    r_ci_up = r_effects + np.abs(stats.norm.ppf(.975)) * np.sqrt(r_vars)
-    py_ci_up = py_effects + np.abs(stats.norm.ppf(.975)) * np.sqrt(py_vars)
+    pip_ci_up = pip_effects + np.abs(stats.norm.ppf(.975)) * np.sqrt(pip_vars)
+    dev_ci_up = dev_effects + np.abs(stats.norm.ppf(.975)) * np.sqrt(dev_vars)
     # get lower confidence intervals
-    r_ci_down = r_effects - np.abs(stats.norm.ppf(.975)) * np.sqrt(r_vars)
-    py_ci_down = py_effects - np.abs(stats.norm.ppf(.975)) * np.sqrt(py_vars)
+    pip_ci_down = pip_effects - np.abs(stats.norm.ppf(.975)) * np.sqrt(pip_vars)
+    dev_ci_down = dev_effects - np.abs(stats.norm.ppf(.975)) * np.sqrt(dev_vars)
     # check if results are inbetween
     # R
-    if np.all((r_effects <= py_ci_up) & (r_effects >= py_ci_down)):
-        print('Marginal effects from R are covered by the CIs from Python.')
+    if np.all((pip_effects <= dev_ci_up) & (pip_effects >= dev_ci_down)):
+        print('Marginal effects from PyPi are covered by the CIs from Dev.')
     else:
-        print('Marginal effects from R are NOT covered by the CIs from Python.')
+        print('Marginal effects from PyPi are NOT covered by the CIs from Dev.')
     # Python
-    if np.all((py_effects <= r_ci_up) & (py_effects >= r_ci_down)):
-        print('Marginal effects from Python are covered by the CIs from R.')
+    if np.all((dev_effects <= pip_ci_up) & (dev_effects >= pip_ci_down)):
+        print('Marginal effects from Dev are covered by the CIs from PyPi.')
     else:
-        print('Marginal effects from Python are NOT covered by the CIs from R.')
+        print('Marginal effects from Dev are NOT covered by the CIs from PyPi.')
         
 # %% End of Comparisons

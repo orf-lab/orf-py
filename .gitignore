@@ -11,6 +11,9 @@
 # osx files
 .DS_Store
 
+# Rhistory files
+.Rhistory
+
 # cache files
 /orf/__pycache__/
 *.pyc
