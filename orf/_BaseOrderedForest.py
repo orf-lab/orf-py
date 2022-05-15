@@ -306,7 +306,7 @@ class BaseOrderedForest(BaseEstimator):
                 y_values = np.unique(y)
             else:
                 # raise value error
-                raise ValueError("n_jobs must be of type integer"
+                raise ValueError("y must be of type integer"
                                  ", got %s" % type(y_values[0]))
 
         # create an empty dictionary to save the forests
