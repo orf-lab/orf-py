@@ -24,9 +24,8 @@ ordered categorical outcomes (so-called ordered choice models). Additionally to
 common machine learning algorithms the Ordered Forest provides functions for estimating
 marginal effects and thus provides similar output as in standard econometric models
 for ordered choice. The core Ordered Forest algorithm relies on the fast forest
-implementations from the `scikit-learn` ([Pedregosa et al., 2011](https://jmlr.csail.mit.edu/papers/v12/pedregosa11a.html)) and
-`EconML` ([Battocchi et al., 2019](https://econml.azurewebsites.net/))
-libraries.
+implementation from the `scikit-learn` ([Pedregosa et al., 2011](https://jmlr.csail.mit.edu/papers/v12/pedregosa11a.html))
+library.
 
 ## Installation
 
@@ -36,12 +35,11 @@ pip install orf
  ```
 in the terminal. `orf` requires the following dependencies:
 
- * numpy (<1.22.0,>=1.21.0)
- * pandas (>=1.4.2)
- * scipy (<1.8.0,>=1.7.2)
+ * numpy (>=1.21.0)
+ * pandas (>=1.3.5)
+ * scipy (>=1.7.2)
  * scikit-learn (>=1.0.2)
- * econml (>=0.13.0)
- * joblib (>=1.1.0)
+ * joblib (>=1.0.1)
  * plotnine (>=0.8.0)
 
 In case of an installation failure due to dependency
@@ -91,9 +89,6 @@ For more detailed examples see the package description.
 
 ## References
 
-- Battocchi, K., Dillon, E., Hei, M., Lewis, G., Oka, P., Oprescu, M. &
-  Syrgkanis, V. (2019). EconML: A Python Package for ML-Based Heterogeneous
- Treatment Effects Estimation. Version 0.13.0, <https://github.com/microsoft/EconML>
 - Lechner, M., & Okasa, G. (2019). Random Forest Estimation of the Ordered Choice Model.
   arXiv preprint arXiv:1907.02436. <https://arxiv.org/abs/1907.02436>
 - Lechner, M., & Okasa, G. (2020). orf: Ordered Random Forests.

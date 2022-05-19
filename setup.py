@@ -9,7 +9,7 @@ long_description = (this_directory / "README.md").read_text()
 setup(
   name = 'orf',
   packages = ['orf'],
-  version = '0.1.1',
+  version = '0.1.2',
   license = 'MIT',
   description = 'orf package implements the Ordered Forest estimator for random forest estimation of the ordered choice models.',
   long_description_content_type='text/markdown',
@@ -20,12 +20,11 @@ setup(
   download_url = 'https://github.com/fmuny/ORFpy/archive/refs/tags/v0.1.1.tar.gz',
   keywords = ['ordered forest', 'ordered choice', 'random forest'],
   install_requires=[
-          'numpy<1.22.0,>=1.21.0',
-          'pandas>=1.4.2',
-          'scipy<1.8.0,>=1.7.2',
+          'numpy>=1.21.0',
+          'pandas>=1.3.5',
+          'scipy>=1.7.2',
           'scikit-learn>=1.0.2',
-          'econml>=0.13.0',
-          'joblib>=1.1.0',
+          'joblib>=1.0.1',
           'plotnine>=0.8.0',
       ],
   classifiers=[
