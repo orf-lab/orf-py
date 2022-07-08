@@ -12,14 +12,12 @@ import numpy as np
 import pandas as pd
 
 import sklearn.ensemble as ske
-#from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.utils import check_random_state, check_X_y
+from sklearn.utils import check_X_y
 from sklearn.utils.validation import (_num_samples, _num_features,
                                       check_random_state)
-#from econml.grf import RegressionForest
 from joblib import Parallel, delayed, parallel_backend
 from multiprocessing import cpu_count, Lock
 
@@ -368,19 +366,6 @@ class BaseOrderedForest(BaseEstimator):
                 # get in-sample predictions, i.e. the out-of-bag predictions
                 probs[:,class_idx-1] = forests[class_idx].oob_prediction_
             else:
-# =============================================================================
-#                 # call rf from econML and save it in dictionary
-#                 forests[class_idx] = RegressionForest(
-#                     n_estimators=self.n_estimators,
-#                     min_samples_leaf=self.min_samples_leaf,
-#                     max_features=self.max_features,
-#                     max_samples=self.sample_fraction,
-#                     random_state=self.random_state,
-#                     honest=False,  # default is True!
-#                     inference=False,  # default is True!
-#                     n_jobs=self.n_jobs,
-#                     subforest_size=1)
-# =============================================================================
                 # monkey patch the original sampling without replacement
                 ske._forest._generate_sample_indices = _generate_sample_indices_subsampling
                 # call rf from scikit learn and save it in dictionary
@@ -394,17 +379,8 @@ class BaseOrderedForest(BaseEstimator):
                     random_state=self.random_state)
                 # fit the model with the binary outcome
                 forests[class_idx].fit(X=X_tr, y=outcome_ind)
-# =============================================================================
-#                 # fit the model with the binary outcome
-#                 forests[class_idx].fit(X=X_tr, y=outcome_ind)
-# =============================================================================
                 # if no honesty, get the oob predictions
                 if not self.honesty:
-# =============================================================================
-#                     # get in-sample predictions, i.e. out-of-bag predictions
-#                     probs[:,class_idx-1] = forests[class_idx].oob_predict(
-#                         X_tr).squeeze()
-# =============================================================================
                     # get in-sample predictions, i.e. out-of-bag predictions
                     probs[:,class_idx-1] = forests[class_idx].oob_prediction_
                 else:

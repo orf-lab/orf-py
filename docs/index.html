@@ -31,11 +31,9 @@ choice models). Additionally to common machine learning algorithms the <code><a 
 package provides functions for estimating marginal effects as well as
 statistical inference thereof and thus provides similar output as in standard
 econometric models for ordered choice. The core forest algorithm relies on the
-fast forest implementations from the
+fast forest implementation from the
 <a href="https://scikit-learn.org/stable/" target="_blank"><code>scikit-learn</code></a>
-(Pedregosa et al., 2011) and
-<a href="https://econml.azurewebsites.net/" target="_blank"><code>EconML</code></a>
-(Battocchi et al., 2019) libraries. For the R version of the
+(Pedregosa et al., 2011) library. For the R version of the
 <code><a title="orf" href="#orf">orf</a></code> package (Lechner &amp; Okasa, 2020), see
 <a href="https://CRAN.R-project.org/package=orf" target="_blank">CRAN</a> repository.</p>
 <h2 id="installation">Installation</h2>
@@ -44,16 +42,16 @@ fast forest implementations from the
 </code></pre>
 <p>in the terminal. <code><a title="orf" href="#orf">orf</a></code> requires the following dependencies:</p>
 <ul>
-<li>numpy (&lt;1.22.0,&gt;=1.21.0)</li>
-<li>pandas (&gt;=1.4.2)</li>
-<li>scipy (&lt;1.8.0,&gt;=1.7.2)</li>
+<li>numpy (&gt;=1.21.0)</li>
+<li>pandas (&gt;=1.3.5)</li>
+<li>scipy (&gt;=1.7.2)</li>
 <li>scikit-learn (&gt;=1.0.2)</li>
-<li>econml (&gt;=0.13.0)</li>
-<li>joblib (&gt;=1.1.0)</li>
+<li>joblib (&gt;=1.0.1)</li>
 <li>plotnine (&gt;=0.8.0)</li>
 </ul>
 <p>In case of an installation failure due to dependency
-issues, consider installing the package in a virtual
+issues or conflicts with Anaconda distribution,
+consider installing the package in a virtual
 environment or try <code>pip install orf --user</code>.</p>
 <p>The implementation relies on Python 3 and is compatible with
 version 3.8, 3.9 and 3.10.</p>
@@ -89,9 +87,6 @@ oforest.margins()
 <p>Michael Lechner, Fabian Muny &amp; Gabriel Okasa</p>
 <h2 id="references">References</h2>
 <ul>
-<li>Battocchi, K., Dillon, E., Hei, M., Lewis, G., Oka, P., Oprescu, M. &amp;
-Syrgkanis, V. (2019). EconML: A Python Package for ML-Based Heterogeneous
-Treatment Effects Estimation. Version 0.13.0, <a href="https://github.com/microsoft/EconML">https://github.com/microsoft/EconML</a></li>
 <li>Lechner, M., &amp; Okasa, G. (2019). Random Forest Estimation of the Ordered
 Choice Model. arXiv preprint arXiv:1907.02436. <a href="https://arxiv.org/abs/1907.02436">https://arxiv.org/abs/1907.02436</a></li>
 <li>Lechner, M., &amp; Okasa, G. (2020). orf: Ordered Random Forests.
