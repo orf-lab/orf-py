@@ -10,7 +10,7 @@ Showcase application of the Ordered Forest estimator.
 import orf
 
 # get example data
-features, outcome  = orf.make_ordered_regression(seed=123)
+features, outcome = orf.make_ordered_regression(seed=123)
 
 # Ordered Forest estimation
 
@@ -28,6 +28,7 @@ oforest.summary()
 oforest.performance()
 # plot predictions
 oforest.plot()
+
 
 # predict ordered probabilities
 pred = oforest.predict(X=features)
