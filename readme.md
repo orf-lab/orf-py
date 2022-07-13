@@ -45,7 +45,7 @@ in the terminal. `orf` requires the following dependencies:
 In case of an installation failure due to dependency
 issues or conflicts with Anaconda distribution,
 consider installing the package in a virtual
-environment or try `pip install orf --user`.
+environment.
 
 The implementation relies on Python 3 and is compatible with version 3.8, 3.9 and 3.10.
 

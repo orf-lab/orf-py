@@ -32,7 +32,7 @@
  In case of an installation failure due to dependency 
  issues or conflicts with Anaconda distribution,
  consider installing the package in a virtual 
- environment or try `pip install orf --user`.
+ environment.
  
  The implementation relies on Python 3 and is compatible with 
  version 3.8, 3.9 and 3.10.
@@ -69,6 +69,16 @@
  oforest.margins()
  ```
 
+ Release Notes
+ ----------------------------
+
+ * Version 0.1.0: Initial release of orf python package
+ * Version 0.1.1: Resolved minor issues regarding the requirements of the
+ package depedencies and updated the description accordingly.
+ * Version 0.2.0: Major update of BaseOrderedForest class. Tree building is now
+ entirely based on scikit-learn and no longer depends on the econML package.
+ This promises faster estimation and a more stable installation process.
+ 
  Authors
  ----------------------------
  Michael Lechner, Fabian Muny & Gabriel Okasa
@@ -86,7 +96,7 @@
 from orf.OrderedForest import OrderedForest
 from orf._utils import make_ordered_regression
 __all__ = ["OrderedForest", "make_ordered_regression"]
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 __module__ = 'orf'
 __author__ = "Michael Lechner, Fabian Muny & Gabriel Okasa"
 __copyright__ = "Copyright (c) 2022, Michael Lechner, Fabian Muny & Gabriel Okasa"

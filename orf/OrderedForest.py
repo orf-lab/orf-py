@@ -9,6 +9,7 @@ Definition of main user classes.
 
 from orf._OrderedRandomForest import OrderedRandomForest
 
+
 class OrderedForest(OrderedRandomForest):
     """
     Ordered Random Forests class labeled `OrderedForest()`. Initializes
@@ -47,10 +48,7 @@ class OrderedForest(OrderedRandomForest):
     replace : bool
         If True, sampling with replacement (i.e. bootstrap) is used
         to grow the trees, otherwise subsampling without replacement is used.
-        For bootstrap the core forest algorithm is based on
-        [`scikit-learn`](https://scikit-learn.org/stable/){:target="_blank"}
-        while [`EconML`](https://econml.azurewebsites.net/){:target="_blank"}
-        is used for subsampling without replacement. The default is False.
+        The default is False.
     sample_fraction : float
         Subsampling rate, i.e. the share of samples to draw from
         the training data to build each tree. The default is 0.5.
@@ -196,7 +194,6 @@ class OrderedForest(OrderedRandomForest):
             random_state=random_state
         )
 
-
     def fit(self, X, y):
         """
         Estimation of the ordered choice model via the Ordered Forest
@@ -282,7 +279,6 @@ class OrderedForest(OrderedRandomForest):
         """
         return super().fit(X=X, y=y)
 
-
     def predict(self, X=None, prob=True):
         """
         Prediction for new observations based on the estimated Ordered Forest
@@ -364,7 +360,6 @@ class OrderedForest(OrderedRandomForest):
         ```
         """
         return super().predict(X=X, prob=prob)
-
 
     def margins(self, X=None, X_cat=None, X_eval=None, eval_point="mean",
                 window=0.1, verbose=True):
@@ -489,7 +484,6 @@ class OrderedForest(OrderedRandomForest):
                                eval_point=eval_point, window=window,
                                verbose=verbose)
 
-
     def summary(self, item=None):
         """
         Summary of estimated Ordered Forest object of class `OrderedForest()`.
@@ -542,7 +536,6 @@ class OrderedForest(OrderedRandomForest):
         """
         return super().summary(item=item)
 
-
     def plot(self):
         """
         Plot the probability distributions estimated by the Ordered Forest
@@ -586,7 +579,6 @@ class OrderedForest(OrderedRandomForest):
         ```
         """
         return super().plot()
-
 
     def performance(self):
         """

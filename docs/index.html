@@ -52,7 +52,7 @@ fast forest implementation from the
 <p>In case of an installation failure due to dependency
 issues or conflicts with Anaconda distribution,
 consider installing the package in a virtual
-environment or try <code>pip install orf --user</code>.</p>
+environment.</p>
 <p>The implementation relies on Python 3 and is compatible with
 version 3.8, 3.9 and 3.10.</p>
 <h2 id="examples">Examples</h2>
@@ -83,6 +83,15 @@ oforest.predict()
 # evaluate marginal effects
 oforest.margins()
 </code></pre>
+<h2 id="release-notes">Release Notes</h2>
+<ul>
+<li>Version 0.1.0: Initial release of orf python package</li>
+<li>Version 0.1.1: Resolved minor issues regarding the requirements of the
+package depedencies and updated the description accordingly.</li>
+<li>Version 0.2.0: Major update of BaseOrderedForest class. Tree building is now
+entirely based on scikit-learn and no longer depends on the econML package.
+This promises faster estimation and a more stable installation process.</li>
+</ul>
 <h2 id="authors">Authors</h2>
 <p>Michael Lechner, Fabian Muny &amp; Gabriel Okasa</p>
 <h2 id="references">References</h2>
@@ -145,10 +154,7 @@ effectively inspect more than <code>max_features</code> features.</p>
 <dt><strong><code>replace</code></strong> :&ensp;<code>bool</code></dt>
 <dd>If True, sampling with replacement (i.e. bootstrap) is used
 to grow the trees, otherwise subsampling without replacement is used.
-For bootstrap the core forest algorithm is based on
-<a href="https://scikit-learn.org/stable/" target="_blank"><code>scikit-learn</code></a>
-while <a href="https://econml.azurewebsites.net/" target="_blank"><code>EconML</code></a>
-is used for subsampling without replacement. The default is False.</dd>
+The default is False.</dd>
 <dt><strong><code>sample_fraction</code></strong> :&ensp;<code>float</code></dt>
 <dd>Subsampling rate, i.e. the share of samples to draw from
 the training data to build each tree. The default is 0.5.</dd>
@@ -726,6 +732,7 @@ features, outcome  = orf.make_ordered_regression(n_samples=2000,
 <li><a href="#description">Description</a></li>
 <li><a href="#installation">Installation</a></li>
 <li><a href="#examples">Examples</a></li>
+<li><a href="#release-notes">Release Notes</a></li>
 <li><a href="#authors">Authors</a></li>
 <li><a href="#references">References</a></li>
 </ul>
